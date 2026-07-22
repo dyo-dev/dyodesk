@@ -94,10 +94,19 @@ jobs:
         shell: bash
         run: |
           FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff \
-             "$FLUTTER_ROOT/"
+          PATCH_FILE="$GITHUB_WORKSPACE/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+
           cd "$FLUTTER_ROOT"
-          git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+
+          if git apply --check "$PATCH_FILE"; then
+            git apply "$PATCH_FILE"
+            echo "Flutter yaması uygulandı."
+          elif git apply --reverse --check "$PATCH_FILE"; then
+            echo "Flutter yaması zaten uygulanmış, devam ediliyor."
+          else
+            echo "Flutter yaması bu Flutter kaynak koduyla uyumlu değil."
+            exit 1
+          fi
 
       - name: Rust kur
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
