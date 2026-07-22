@@ -85,7 +85,7 @@ translations = {
     "Service is not running": "DyoDesk hizmeti çalışmıyor",
     "Start service": "Hizmeti Başlat",
     "New Connection": "Yeni Bağlantı",
-    "Recent Sessions": "Son Bağlantılar",
+    "Recent sessions": "Son Bağlantılar",
     "Favorites": "Favoriler",
     "empty_recent_tip": (
         "Henüz bağlantı geçmişi yok.\\n"
