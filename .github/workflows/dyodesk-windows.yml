@@ -118,7 +118,7 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
-      - name: vcpkg bağımlılıklarını kur
+       - name: vcpkg bağımlılıklarını kur
         shell: bash
         env:
           VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
@@ -126,25 +126,30 @@ jobs:
           "$VCPKG_ROOT/vcpkg" install \
             --triplet x64-windows-static \
             --x-install-root="$VCPKG_ROOT/installed"
-        - name: DyoDesk çekirdek ayarlarını uygula
+
+      - name: DyoDesk çekirdek ayarlarını uygula
         shell: powershell
         env:
           DYODESK_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
           DYODESK_KEY: ${{ secrets.RS_PUB_KEY }}
         run: |
-          python .\res\dyodesk_core_patch.py  
+          python .\res\dyodesk_core_patch.py
+
       - name: DyoDesk arayüz metinlerini uygula
         shell: powershell
         run: |
           python .\res\dyodesk_ui_patch.py
-       - name: DyoDesk logo ve ikonlarını uygula
+
+      - name: DyoDesk logo ve ikonlarını uygula
         shell: powershell
         run: |
           python .\res\dyodesk_brand_patch.py
+
       - name: DyoDesk görsel temasını uygula
         shell: powershell
         run: |
-          python .\res\dyodesk_theme_patch.py    
+          python .\res\dyodesk_theme_patch.py
+
       - name: DyoDesk'i derle
         shell: powershell
         run: |
