@@ -141,6 +141,10 @@ jobs:
         shell: powershell
         run: |
           python .\res\dyodesk_brand_patch.py
+      - name: DyoDesk görsel temasını uygula
+        shell: powershell
+        run: |
+          python .\res\dyodesk_theme_patch.py    
       - name: DyoDesk'i derle
         shell: powershell
         run: |
