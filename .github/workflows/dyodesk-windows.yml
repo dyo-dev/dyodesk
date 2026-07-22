@@ -118,7 +118,7 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
-       - name: vcpkg bağımlılıklarını kur
+      - name: vcpkg bağımlılıklarını kur
         shell: bash
         env:
           VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-static
