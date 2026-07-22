@@ -11,7 +11,9 @@ FILES = {
         Path("flutter/assets/logo_dark.png"),
     ],
     SOURCE_DIR / "dyodesk_icon.png": [
-        Path("flutter/assets/icon.png"),
+    Path("flutter/assets/icon.png"),
+    Path("res/icon.png"),
+],
     ],
     SOURCE_DIR / "dyodesk_icon.ico": [
         Path("flutter/windows/runner/resources/app_icon.ico"),
