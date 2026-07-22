@@ -133,6 +133,10 @@ jobs:
           DYODESK_KEY: ${{ secrets.RS_PUB_KEY }}
         run: |
           python .\res\dyodesk_core_patch.py  
+      - name: DyoDesk arayüz metinlerini uygula
+        shell: powershell
+        run: |
+          python .\res\dyodesk_ui_patch.py
       - name: DyoDesk'i derle
         shell: powershell
         run: |
