@@ -97,36 +97,23 @@ config2_pattern = (
 
 config2_injection = (
     r"\1" + f"""
-        let mut dyodesk_defaults_changed = false;
+        config.options.insert(
+            "custom-rendezvous-server".to_owned(),
+            "{safe_id_server}".to_owned(),
+        );
 
-        if !config.options.contains_key("custom-rendezvous-server") {{
-            config.options.insert(
-                "custom-rendezvous-server".to_owned(),
-                "{safe_id_server}".to_owned(),
-            );
-            dyodesk_defaults_changed = true;
-        }}
+        config.options.insert(
+            "relay-server".to_owned(),
+            "{safe_relay_server}".to_owned(),
+        );
 
-        if !config.options.contains_key("relay-server") {{
-            config.options.insert(
-                "relay-server".to_owned(),
-                "{safe_relay_server}".to_owned(),
-            );
-            dyodesk_defaults_changed = true;
-        }}
+        config.options.insert(
+            "key".to_owned(),
+            "{safe_key}".to_owned(),
+        );
 
-        if !config.options.contains_key("key") {{
-            config.options.insert(
-                "key".to_owned(),
-                "{safe_key}".to_owned(),
-            );
-            dyodesk_defaults_changed = true;
-        }}
-
-        if dyodesk_defaults_changed {{
-            config.rendezvous_server = "{safe_id_server}".to_owned();
-            store = true;
-        }}
+        config.rendezvous_server = "{safe_id_server}".to_owned();
+        store = true;
 """
 )
 
