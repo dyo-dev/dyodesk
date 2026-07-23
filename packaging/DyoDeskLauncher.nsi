@@ -12,6 +12,10 @@ SetCompressor /SOLID lzma
   !error "PROJECT_ROOT tanımlanmadı."
 !endif
 
+!ifndef BUILD_DATE
+  !error "BUILD_DATE tanımlanmadı."
+!endif
+
 Name "DyoDesk"
 Caption "DyoDesk"
 BrandingText "Powered by Dyo Bilgi Sistemleri"
@@ -298,6 +302,18 @@ Function InstallDyoDesk
   WriteRegStr HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
     "DisplayVersion" "1.0.0"
+
+  WriteRegStr HKLM \
+    "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
+    "Version" "1.0.0"
+
+  WriteRegStr HKLM \
+    "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
+    "BuildDate" "${BUILD_DATE}"
+
+  WriteRegStr HKLM \
+    "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
+    "InstallLocation" "$INSTDIR"
 
   WriteRegDWORD HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
