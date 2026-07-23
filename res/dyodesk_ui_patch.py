@@ -65,6 +65,11 @@ for language_file in LANG_FILES:
 
     text = language_file.read_text(encoding="utf-8")
     text = replace_brand_in_values(text)
+    text = set_translation(
+        text,
+        "powered_by_me",
+        "Powered by Dyo Bilgi Sistemleri",
+    )
     language_file.write_text(text, encoding="utf-8")
 
 
@@ -87,6 +92,16 @@ translations = {
     "New Connection": "Yeni Bağlantı",
     "Recent sessions": "Son Bağlantılar",
     "Favorites": "Favoriler",
+    "Settings": "Ayarlar",
+    "Network": "Ağ",
+    "General": "Genel",
+    "Security": "Güvenlik",
+    "Display": "Görüntü",
+    "About": "Hakkında",
+    "ID/Relay server": "ID/Relay Sunucusu",
+    "ID server": "ID Sunucusu",
+    "Relay server": "Relay Sunucusu",
+    "Key": "Anahtar",
     "empty_recent_tip": (
         "Henüz bağlantı geçmişi yok.\\n"
         "Yeni bir bağlantı başlatın."
