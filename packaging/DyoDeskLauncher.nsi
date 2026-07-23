@@ -8,12 +8,17 @@ SetCompressor /SOLID lzma
 !include "x64.nsh"
 !include "FileFunc.nsh"
 
+!ifndef PROJECT_ROOT
+  !error "PROJECT_ROOT tanımlanmadı."
+!endif
+
 Name "DyoDesk"
 Caption "DyoDesk"
 BrandingText "Powered by Dyo Bilgi Sistemleri"
-OutFile "${__FILEDIR__}\output\DyoDesk.exe"
-Icon "${__FILEDIR__}\..\res\dyodesk_icon.ico"
-UninstallIcon "${__FILEDIR__}\..\res\dyodesk_icon.ico"
+
+OutFile "${PROJECT_ROOT}\packaging\output\DyoDesk.exe"
+Icon "${PROJECT_ROOT}\res\dyodesk_icon.ico"
+UninstallIcon "${PROJECT_ROOT}\res\dyodesk_icon.ico"
 
 VIProductVersion "1.0.0.0"
 VIAddVersionKey "ProductName" "DyoDesk"
@@ -31,8 +36,8 @@ ShowUninstDetails show
 AutoCloseWindow false
 WindowIcon on
 
-!define MUI_ICON "${__FILEDIR__}\..\res\dyodesk_icon.ico"
-!define MUI_UNICON "${__FILEDIR__}\..\res\dyodesk_icon.ico"
+!define MUI_ICON "${PROJECT_ROOT}\res\dyodesk_icon.ico"
+!define MUI_UNICON "${PROJECT_ROOT}\res\dyodesk_icon.ico"
 !define MUI_ABORTWARNING
 
 Var ModePage
@@ -132,7 +137,7 @@ FunctionEnd
 Function ExtractX64Payload
   InitPluginsDir
   SetOutPath "$PLUGINSDIR\DyoDesk"
-  File /r "${__FILEDIR__}\payload\x64\*.*"
+  File /r "${PROJECT_ROOT}\packaging\payload\x64\*.*"
 FunctionEnd
 
 
