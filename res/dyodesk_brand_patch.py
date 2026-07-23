@@ -17,6 +17,7 @@ FILES = {
     SOURCE_DIR / "dyodesk_icon.ico": [
         Path("flutter/windows/runner/resources/app_icon.ico"),
         Path("flutter/assets/icon.ico"),
+        Path("res/icon.ico"),
     ],
 }
 
@@ -32,4 +33,4 @@ for source, destinations in FILES.items():
         shutil.copy2(source, destination)
         print(f"Uygulandı: {source} -> {destination}")
 
-print("DyoDesk logo ve Windows ikonları başarıyla uygulandı.")
+print("DyoDesk logo ve tüm Windows ikonları başarıyla uygulandı.")
