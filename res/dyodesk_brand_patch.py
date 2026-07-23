@@ -16,6 +16,7 @@ FILES = {
     ],
     SOURCE_DIR / "dyodesk_icon.ico": [
         Path("flutter/windows/runner/resources/app_icon.ico"),
+        Path("flutter/assets/icon.ico"),
     ],
 }
 
