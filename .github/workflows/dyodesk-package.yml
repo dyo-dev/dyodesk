@@ -97,7 +97,10 @@ jobs:
             throw "makensis.exe bulunamadı."
           }
 
-          & $makensis /V3 "packaging\DyoDeskLauncher.nsi"
+          & $makensis `
+            "/DPROJECT_ROOT=$env:GITHUB_WORKSPACE" `
+            /V3 `
+            "packaging\DyoDeskLauncher.nsi"
 
           if ($LASTEXITCODE -ne 0) {
             throw "NSIS paketleme işlemi başarısız oldu."
