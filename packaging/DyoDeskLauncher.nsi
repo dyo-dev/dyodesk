@@ -41,12 +41,13 @@ WindowIcon on
 !define MUI_ABORTWARNING
 
 Var ModePage
-Var PortableRadio
-Var InstallRadio
+Var PortableButton
+Var InstallButton
 Var Mode
 Var ResultCode
+Var ServiceName
 
-Page custom ModePageCreate ModePageLeave
+Page custom ModePageCreate
 !insertmacro MUI_PAGE_INSTFILES
 
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -61,23 +62,19 @@ Function IsElevated
 FunctionEnd
 
 
-Function RelaunchElevatedForInstall
-  Call IsElevated
-  Pop $0
-
-  ${If} $0 == 0
-    ExecShell "runas" "$EXEPATH" "/MODE=install"
-    Quit
-  ${EndIf}
-FunctionEnd
-
-
 Function .onInit
   ${GetParameters} $0
   ${GetOptions} $0 "/MODE=" $Mode
 
   ${If} $Mode == "install"
-    Call RelaunchElevatedForInstall
+    Call IsElevated
+    Pop $1
+
+    ${If} $1 == 0
+      MessageBox MB_ICONSTOP|MB_OK \
+        "Kurulum için yönetici yetkisi alınamadı."
+      Quit
+    ${EndIf}
   ${EndIf}
 FunctionEnd
 
@@ -94,42 +91,63 @@ Function ModePageCreate
     Abort
   ${EndIf}
 
-  ${NSD_CreateLabel} 0 0 100% 26u "DyoDesk nasıl çalıştırılsın?"
+  GetDlgItem $0 $HWNDPARENT 1
+  ShowWindow $0 ${SW_HIDE}
+
+  ${NSD_CreateLabel} 0 0 100% 20u "DyoDesk nasıl çalıştırılsın?"
   Pop $0
   CreateFont $1 "Segoe UI" 14 700
   SendMessage $0 ${WM_SETFONT} $1 1
 
-  ${NSD_CreateLabel} 0 32u 100% 24u \
-    "Geçici kullanım için kurulumsuz çalıştırabilir veya sürekli erişim için bilgisayara kurabilirsiniz."
+  ${NSD_CreateLabel} 0 22u 100% 20u \
+    "Geçici kullanım için kurulumsuz çalıştırın veya sürekli erişim için bilgisayara kurun."
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 72u 100% 18u "Kurulumsuz Çalıştır"
-  Pop $PortableRadio
-  ${NSD_Check} $PortableRadio
+  ${NSD_CreateButton} 0 48u 100% 26u "Kurulumsuz Çalıştır"
+  Pop $PortableButton
+  ${NSD_OnClick} $PortableButton PortableClicked
 
-  ${NSD_CreateLabel} 20u 92u 95% 28u \
-    "Teknisyen kullanımı içindir. Hizmet, kısayol ve kaldırma kaydı oluşturmaz."
+  ${NSD_CreateLabel} 4u 76u 96% 18u \
+    "Teknisyen kullanımı: hizmet, kısayol ve kaldırma kaydı oluşturmaz."
   Pop $0
 
-  ${NSD_CreateRadioButton} 0 132u 100% 18u "Bu Bilgisayara Kur"
-  Pop $InstallRadio
+  ${NSD_CreateButton} 0 100u 100% 26u "Bu Bilgisayara Kur"
+  Pop $InstallButton
+  ${NSD_OnClick} $InstallButton InstallClicked
 
-  ${NSD_CreateLabel} 20u 152u 95% 38u \
-    "Sürekli erişim, Windows hizmeti, açılışta çalışma ve UAC ekranlarında tam kontrol sağlar."
+  ${NSD_CreateLabel} 4u 128u 96% 20u \
+    "Sürekli erişim: Windows hizmeti, açılışta çalışma ve UAC desteği sağlar."
   Pop $0
 
   nsDialogs::Show
 FunctionEnd
 
 
-Function ModePageLeave
-  ${NSD_GetState} $InstallRadio $0
+Function PortableClicked
+  StrCpy $Mode "portable"
+  SendMessage $HWNDPARENT ${WM_COMMAND} 1 0
+FunctionEnd
 
-  ${If} $0 == ${BST_CHECKED}
-    StrCpy $Mode "install"
-    Call RelaunchElevatedForInstall
+
+Function InstallClicked
+  Call IsElevated
+  Pop $0
+
+  ${If} $0 == 0
+    ClearErrors
+    ExecShell "runas" "$EXEPATH" "/MODE=install"
+
+    IfErrors InstallElevationFailed
+
+    Quit
+
+    InstallElevationFailed:
+      MessageBox MB_ICONSTOP|MB_OK \
+        "Yönetici izni verilmediği için kurulum başlatılamadı."
+      Return
   ${Else}
-    StrCpy $Mode "portable"
+    StrCpy $Mode "install"
+    SendMessage $HWNDPARENT ${WM_COMMAND} 1 0
   ${EndIf}
 FunctionEnd
 
@@ -162,6 +180,35 @@ Function RunPortable
 FunctionEnd
 
 
+Function FindAndStartService
+  StrCpy $ServiceName "DyoDesk"
+
+  nsExec::ExecToLog '"$SYSDIR\sc.exe" query DyoDesk'
+  Pop $ResultCode
+
+  ${If} $ResultCode != 0
+    StrCpy $ServiceName "RustDesk"
+
+    nsExec::ExecToLog '"$SYSDIR\sc.exe" query RustDesk'
+    Pop $ResultCode
+  ${EndIf}
+
+  ${If} $ResultCode != 0
+    MessageBox MB_ICONEXCLAMATION|MB_OK \
+      "DyoDesk dosyaları kuruldu ancak Windows hizmeti oluşturulamadı.$\r$\n$\r$\nKurulum günlüğünü kontrol edeceğiz."
+    Return
+  ${EndIf}
+
+  nsExec::ExecToLog \
+    '"$SYSDIR\sc.exe" config "$ServiceName" start= auto'
+  Pop $ResultCode
+
+  nsExec::ExecToLog \
+    '"$SYSDIR\sc.exe" start "$ServiceName"'
+  Pop $ResultCode
+FunctionEnd
+
+
 Function InstallDyoDesk
   ${IfNot} ${RunningX64}
     MessageBox MB_ICONSTOP|MB_OK \
@@ -170,11 +217,16 @@ Function InstallDyoDesk
   ${EndIf}
 
   SetRegView 64
+  SetShellVarContext all
   StrCpy $INSTDIR "$PROGRAMFILES64\DyoDesk"
 
-  DetailPrint "Eski DyoDesk hizmeti durduruluyor..."
+  DetailPrint "Eski DyoDesk işlemleri durduruluyor..."
   nsExec::ExecToLog '"$SYSDIR\sc.exe" stop DyoDesk'
+  Pop $ResultCode
+  nsExec::ExecToLog '"$SYSDIR\sc.exe" stop RustDesk'
+  Pop $ResultCode
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DyoDesk.exe'
+  Pop $ResultCode
   Sleep 1000
 
   DetailPrint "DyoDesk dosyaları hazırlanıyor..."
@@ -237,14 +289,19 @@ Function InstallDyoDesk
     "NoRepair" 1
 
   DetailPrint "DyoDesk Windows hizmeti kuruluyor..."
-  nsExec::ExecToLog '"$INSTDIR\DyoDesk.exe" --install-service'
+
+  nsExec::ExecToLog \
+    '"$INSTDIR\DyoDesk.exe" --install-service'
   Pop $ResultCode
 
-  nsExec::ExecToLog '"$SYSDIR\sc.exe" config DyoDesk start= auto'
-  nsExec::ExecToLog '"$SYSDIR\sc.exe" start DyoDesk'
+  Sleep 1500
+  Call FindAndStartService
 
   MessageBox MB_ICONINFORMATION|MB_OK \
-    "DyoDesk kurulumu tamamlandı.$\r$\n$\r$\nWindows hizmeti kuruldu ve sürekli erişim hazırlandı."
+    "DyoDesk kurulumu tamamlandı.$\r$\n$\r$\nProgram Files, masaüstü kısayolu ve Windows hizmeti hazırlandı."
+
+  Exec '"$INSTDIR\DyoDesk.exe"'
+  Quit
 FunctionEnd
 
 
@@ -272,10 +329,18 @@ FunctionEnd
 
 Section "Uninstall"
   SetRegView 64
+  SetShellVarContext all
 
   nsExec::ExecToLog '"$SYSDIR\sc.exe" stop DyoDesk'
+  Pop $ResultCode
   nsExec::ExecToLog '"$SYSDIR\sc.exe" delete DyoDesk'
+  Pop $ResultCode
+  nsExec::ExecToLog '"$SYSDIR\sc.exe" stop RustDesk'
+  Pop $ResultCode
+  nsExec::ExecToLog '"$SYSDIR\sc.exe" delete RustDesk'
+  Pop $ResultCode
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DyoDesk.exe'
+  Pop $ResultCode
 
   Delete "$DESKTOP\DyoDesk.lnk"
   RMDir /r "$SMPROGRAMS\DyoDesk"
