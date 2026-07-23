@@ -250,10 +250,31 @@ Function InstallDyoDesk
   WriteUninstaller "$INSTDIR\DyoDeskKaldir.exe"
 
   CreateDirectory "$SMPROGRAMS\DyoDesk"
+
+  Delete "$SMPROGRAMS\DyoDesk\DyoDesk.lnk"
+  Delete "$DESKTOP\DyoDesk.lnk"
+
+  IfFileExists "$INSTDIR\data\flutter_assets\assets\icon.ico" 0 UseExeIcon
+
   CreateShortcut "$SMPROGRAMS\DyoDesk\DyoDesk.lnk" \
-    "$INSTDIR\DyoDesk.exe" "" "$INSTDIR\DyoDesk.exe"
+    "$INSTDIR\DyoDesk.exe" "" \
+    "$INSTDIR\data\flutter_assets\assets\icon.ico" 0
+
   CreateShortcut "$DESKTOP\DyoDesk.lnk" \
-    "$INSTDIR\DyoDesk.exe" "" "$INSTDIR\DyoDesk.exe"
+    "$INSTDIR\DyoDesk.exe" "" \
+    "$INSTDIR\data\flutter_assets\assets\icon.ico" 0
+
+  Goto ShortcutsReady
+
+  UseExeIcon:
+  CreateShortcut "$SMPROGRAMS\DyoDesk\DyoDesk.lnk" \
+    "$INSTDIR\DyoDesk.exe" "" "$INSTDIR\DyoDesk.exe" 0
+
+  CreateShortcut "$DESKTOP\DyoDesk.lnk" \
+    "$INSTDIR\DyoDesk.exe" "" "$INSTDIR\DyoDesk.exe" 0
+
+  ShortcutsReady:
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 
   WriteRegStr HKLM "Software\Dyo Bilgi Sistemleri\DyoDesk" \
     "InstallPath" "$INSTDIR"
@@ -264,7 +285,7 @@ Function InstallDyoDesk
 
   WriteRegStr HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
-    "DisplayIcon" "$INSTDIR\DyoDesk.exe"
+    "DisplayIcon" "$INSTDIR\data\flutter_assets\assets\icon.ico"
 
   WriteRegStr HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
