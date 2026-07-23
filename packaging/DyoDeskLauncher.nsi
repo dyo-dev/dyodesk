@@ -159,6 +159,12 @@ Function ExtractX64Payload
 FunctionEnd
 
 
+Function InstallX64Payload
+  SetOutPath "$INSTDIR"
+  File /r "${PROJECT_ROOT}\packaging\payload\x64\*.*"
+FunctionEnd
+
+
 Function RunPortable
   ${IfNot} ${RunningX64}
     MessageBox MB_ICONSTOP|MB_OK \
@@ -230,27 +236,16 @@ Function InstallDyoDesk
   Sleep 1000
   DetailPrint "Eski DyoDesk hizmetleri durduruldu."
 
-  DetailPrint "DyoDesk dosyaları hazırlanıyor..."
-  Call ExtractX64Payload
-
+  DetailPrint "DyoDesk dosyaları $INSTDIR klasörüne kuruluyor..."
   CreateDirectory "$INSTDIR"
+  Call InstallX64Payload
 
-  DetailPrint "Dosyalar $INSTDIR klasörüne kopyalanıyor..."
-  nsExec::ExecToLog \
-    '"$COMSPEC" /D /C xcopy "$PLUGINSDIR\DyoDesk\*" "$INSTDIR" /E /I /H /R /Y'
-  Pop $ResultCode
-
-  ${If} $ResultCode != 0
-  ${AndIf} $ResultCode != 1
+  IfFileExists "$INSTDIR\DyoDesk.exe" InstallFilesReady 0
     MessageBox MB_ICONSTOP|MB_OK \
-      "DyoDesk dosyaları kopyalanamadı.$\r$\n$\r$\nHata kodu: $ResultCode$\r$\nHedef: $INSTDIR"
+      "Kurulum dosyaları çıkarıldı ancak DyoDesk.exe bulunamadı.$\r$\n$\r$\nHedef: $INSTDIR"
     Abort
-  ${EndIf}
 
-  IfFileExists "$INSTDIR\DyoDesk.exe" +3 0
-    MessageBox MB_ICONSTOP|MB_OK \
-      "Kurulum klasöründe DyoDesk.exe bulunamadı.$\r$\n$\r$\nHedef: $INSTDIR"
-    Abort
+  InstallFilesReady:
 
   WriteUninstaller "$INSTDIR\DyoDeskKaldir.exe"
 
