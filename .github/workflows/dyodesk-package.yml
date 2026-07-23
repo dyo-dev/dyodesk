@@ -79,6 +79,23 @@ jobs:
         run: |
           choco install nsis --no-progress -y
 
+      - name: NSIS dosyasını Unicode olarak hazırla
+        shell: powershell
+        run: |
+          $source = Join-Path `
+            $env:GITHUB_WORKSPACE `
+            "packaging\DyoDeskLauncher.nsi"
+
+          $target = Join-Path `
+            $env:GITHUB_WORKSPACE `
+            "packaging\DyoDeskLauncher.unicode.nsi"
+
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          $utf16 = [System.Text.UnicodeEncoding]::new($false, $true)
+
+          $content = [System.IO.File]::ReadAllText($source, $utf8)
+          [System.IO.File]::WriteAllText($target, $content, $utf16)
+
       - name: Tek DyoDesk.exe derle
         shell: powershell
         run: |
@@ -100,7 +117,7 @@ jobs:
           & $makensis `
             "/DPROJECT_ROOT=$env:GITHUB_WORKSPACE" `
             /V3 `
-            "packaging\DyoDeskLauncher.nsi"
+            "packaging\DyoDeskLauncher.unicode.nsi"
 
           if ($LASTEXITCODE -ne 0) {
             throw "NSIS paketleme işlemi başarısız oldu."
@@ -109,6 +126,6 @@ jobs:
       - name: Tek EXE artifact yükle
         uses: actions/upload-artifact@v4
         with:
-          name: dyodesk-single-exe-x64-test
+          name: dyodesk-single-exe-x64-test-v2
           path: packaging/output/DyoDesk.exe
           retention-days: 14
