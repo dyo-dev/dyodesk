@@ -1,0 +1,111 @@
+name: DyoDesk Tek EXE Paketle
+
+on:
+  workflow_dispatch:
+    inputs:
+      x64_run_id:
+        description: "Başarılı x64 derlemesinin Actions Run ID numarası"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    name: Tek DyoDesk.exe oluştur
+    runs-on: windows-2022
+
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@v4
+
+      - name: x64 DyoDesk artifact indir
+        uses: actions/download-artifact@v4
+        with:
+          name: dyodesk-windows-x64-fast
+          path: packaging/payload/x64
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.x64_run_id }}
+
+      - name: x64 ana dosya adını DyoDesk yap
+        shell: powershell
+        run: |
+          $payload = Join-Path $env:GITHUB_WORKSPACE "packaging\payload\x64"
+
+          $rustDeskExe = Get-ChildItem `
+            -Path $payload `
+            -Filter "rustdesk.exe" `
+            -Recurse `
+            -File `
+            | Select-Object -First 1
+
+          $dyoDeskExe = Get-ChildItem `
+            -Path $payload `
+            -Filter "DyoDesk.exe" `
+            -Recurse `
+            -File `
+            | Select-Object -First 1
+
+          if (-not $dyoDeskExe -and $rustDeskExe) {
+            Rename-Item `
+              -LiteralPath $rustDeskExe.FullName `
+              -NewName "DyoDesk.exe"
+          }
+
+          $dyoDeskExe = Get-ChildItem `
+            -Path $payload `
+            -Filter "DyoDesk.exe" `
+            -Recurse `
+            -File `
+            | Select-Object -First 1
+
+          if (-not $dyoDeskExe) {
+            throw "DyoDesk.exe veya rustdesk.exe artifact içinde bulunamadı."
+          }
+
+          if ($dyoDeskExe.DirectoryName -ne $payload) {
+            Get-ChildItem -LiteralPath $dyoDeskExe.DirectoryName -Force |
+              Copy-Item -Destination $payload -Recurse -Force
+          }
+
+          if (-not (Test-Path "$payload\DyoDesk.exe")) {
+            throw "Paketleme klasöründe DyoDesk.exe hazırlanamadı."
+          }
+
+      - name: NSIS kur
+        shell: powershell
+        run: |
+          choco install nsis --no-progress -y
+
+      - name: Tek DyoDesk.exe derle
+        shell: powershell
+        run: |
+          New-Item `
+            -ItemType Directory `
+            -Path "packaging\output" `
+            -Force | Out-Null
+
+          $makensis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+
+          if (-not (Test-Path $makensis)) {
+            $makensis = "C:\Program Files\NSIS\makensis.exe"
+          }
+
+          if (-not (Test-Path $makensis)) {
+            throw "makensis.exe bulunamadı."
+          }
+
+          & $makensis /V3 "packaging\DyoDeskLauncher.nsi"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "NSIS paketleme işlemi başarısız oldu."
+          }
+
+      - name: Tek EXE artifact yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: dyodesk-single-exe-x64-test
+          path: packaging/output/DyoDesk.exe
+          retention-days: 14
