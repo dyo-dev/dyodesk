@@ -74,6 +74,34 @@ jobs:
             throw "Paketleme klasöründe DyoDesk.exe hazırlanamadı."
           }
 
+      - name: x64 artifact ikonunu doğrula
+        shell: powershell
+        run: |
+          $expected = Join-Path `
+            $env:GITHUB_WORKSPACE `
+            "res\dyodesk_icon.ico"
+
+          $runtime = Join-Path `
+            $env:GITHUB_WORKSPACE `
+            "packaging\payload\x64\data\flutter_assets\assets\icon.ico"
+
+          if (-not (Test-Path $expected)) {
+            throw "res\dyodesk_icon.ico bulunamadı."
+          }
+
+          if (-not (Test-Path $runtime)) {
+            throw "Artifact içinde çalışma ikonu bulunamadı. Önce yeni x64 derlemesi çalıştırılmalı."
+          }
+
+          $expectedHash = (Get-FileHash $expected -Algorithm SHA256).Hash
+          $runtimeHash = (Get-FileHash $runtime -Algorithm SHA256).Hash
+
+          if ($expectedHash -ne $runtimeHash) {
+            throw "Girilen x64_run_id eski ikonlu artifact'e ait. Yeni x64 derlemesinin Run ID'sini kullanın."
+          }
+
+          Write-Host "DyoDesk çalışma ikonu doğrulandı."
+
       - name: NSIS kur
         shell: powershell
         run: |
@@ -114,8 +142,11 @@ jobs:
             throw "makensis.exe bulunamadı."
           }
 
+          $buildDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ss"
+
           & $makensis `
             "/DPROJECT_ROOT=$env:GITHUB_WORKSPACE" `
+            "/DBUILD_DATE=$buildDate" `
             /V3 `
             "packaging\DyoDeskLauncher.unicode.nsi"
 
