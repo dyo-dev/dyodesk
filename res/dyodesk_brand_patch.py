@@ -11,9 +11,8 @@ FILES = {
         Path("flutter/assets/logo_dark.png"),
     ],
     SOURCE_DIR / "dyodesk_icon.png": [
-    Path("flutter/assets/icon.png"),
-    Path("res/icon.png"),
-],
+        Path("flutter/assets/icon.png"),
+        Path("res/icon.png"),
     ],
     SOURCE_DIR / "dyodesk_icon.ico": [
         Path("flutter/windows/runner/resources/app_icon.ico"),
@@ -23,7 +22,9 @@ FILES = {
 
 for source, destinations in FILES.items():
     if not source.exists():
-        raise FileNotFoundError(f"DyoDesk marka dosyası bulunamadı: {source}")
+        raise FileNotFoundError(
+            f"DyoDesk marka dosyası bulunamadı: {source}"
+        )
 
     for destination in destinations:
         destination.parent.mkdir(parents=True, exist_ok=True)
