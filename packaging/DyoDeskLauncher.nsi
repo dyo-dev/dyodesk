@@ -225,29 +225,32 @@ Function InstallDyoDesk
   Pop $ResultCode
   nsExec::ExecToLog '"$SYSDIR\sc.exe" stop RustDesk'
   Pop $ResultCode
-  nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DyoDesk.exe'
-  Pop $ResultCode
+  ; Kurulum dosyasının adı da DyoDesk.exe olduğu için burada
+  ; taskkill /IM DyoDesk.exe kullanılamaz; başlatıcı kendini kapatır.
   Sleep 1000
+  DetailPrint "Eski DyoDesk hizmetleri durduruldu."
 
   DetailPrint "DyoDesk dosyaları hazırlanıyor..."
   Call ExtractX64Payload
 
   CreateDirectory "$INSTDIR"
 
+  DetailPrint "Dosyalar $INSTDIR klasörüne kopyalanıyor..."
   nsExec::ExecToLog \
-    '"$COMSPEC" /C xcopy "$PLUGINSDIR\DyoDesk\*" "$INSTDIR\" /E /I /H /R /Y'
+    '"$COMSPEC" /D /C xcopy "$PLUGINSDIR\DyoDesk\*" "$INSTDIR" /E /I /H /R /Y'
   Pop $ResultCode
 
   ${If} $ResultCode != 0
   ${AndIf} $ResultCode != 1
     MessageBox MB_ICONSTOP|MB_OK \
-      "DyoDesk dosyaları kopyalanamadı. Hata kodu: $ResultCode"
-    Quit
+      "DyoDesk dosyaları kopyalanamadı.$\r$\n$\r$\nHata kodu: $ResultCode$\r$\nHedef: $INSTDIR"
+    Abort
   ${EndIf}
 
   IfFileExists "$INSTDIR\DyoDesk.exe" +3 0
-    MessageBox MB_ICONSTOP|MB_OK "Kurulum klasöründe DyoDesk.exe bulunamadı."
-    Quit
+    MessageBox MB_ICONSTOP|MB_OK \
+      "Kurulum klasöründe DyoDesk.exe bulunamadı.$\r$\n$\r$\nHedef: $INSTDIR"
+    Abort
 
   WriteUninstaller "$INSTDIR\DyoDeskKaldir.exe"
 
