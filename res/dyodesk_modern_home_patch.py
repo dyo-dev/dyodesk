@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 HOME_FILE = Path(
     "flutter/lib/desktop/pages/desktop_home_page.dart"
@@ -77,17 +78,17 @@ modern_build = '''  @override
     return _buildBlock(
       child: Container(
         color: const Color(0xFFF4F5F7),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         child: Column(
           children: [
             _buildDyoDeskTopBar(context),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   buildLeftPane(context),
-                  if (!isIncomingOnly) const SizedBox(width: 12),
+                  if (!isIncomingOnly) const SizedBox(width: 10),
                   if (!isIncomingOnly)
                     Expanded(child: buildRightPane(context)),
                 ],
@@ -104,19 +105,19 @@ modern_build = '''  @override
         Theme.of(context).textTheme.titleLarge?.color ?? Colors.black87;
 
     return Container(
-      height: 54,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.background,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Colors.black.withOpacity(0.06),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -125,66 +126,19 @@ modern_build = '''  @override
           const Icon(
             Icons.desktop_windows_rounded,
             color: MyTheme.accent,
-            size: 24,
+            size: 22,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 9),
           Text(
             'DyoDesk',
             style: TextStyle(
               color: textColor,
-              fontSize: 19,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
             ),
           ),
-          const SizedBox(width: 10),
-          Container(
-            width: 1,
-            height: 22,
-            color: Colors.black.withOpacity(0.10),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'Dyo Bilgi Sistemleri',
-            style: TextStyle(
-              color: textColor.withOpacity(0.52),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: MyTheme.accent.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF22B987),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  translate('Ready'),
-                  style: TextStyle(
-                    color: textColor.withOpacity(0.72),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
           IconButton(
             tooltip: translate('Settings'),
             onPressed: DesktopTabPage.onAddSetting,
@@ -232,7 +186,7 @@ left_replacement = '''    return ChangeNotifierProvider.value(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.background,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: Colors.black.withOpacity(0.06),
           ),
@@ -261,7 +215,7 @@ replace_section(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: Colors.black.withOpacity(0.06),
         ),
@@ -296,6 +250,98 @@ if old_logo in content:
     print("Logo yerleşimi güncellendi.")
 else:
     print("Logo yerleşimi mevcut tema tarafından değiştirilmiş; bu adım atlandı.")
+
+
+# Küçük "Powered by Dyo Bilgi Sistemleri" satırını kaldır.
+powered_pattern = re.compile(
+    r"""if\s*\(bind\.isCustomClient\(\)\)\s*
+        Align\(\s*
+          alignment:\s*Alignment\.center,\s*
+          child:\s*loadPowered\(context\),\s*
+        \),""",
+    re.MULTILINE,
+)
+content, powered_count = powered_pattern.subn("", content, count=1)
+print(
+    "Powered by satırı kaldırıldı."
+    if powered_count == 1
+    else "Powered by satırı bulunamadı veya önceden kaldırılmış."
+)
+
+# Sol panel içeriğini gerçek kaydırılabilir alana dönüştür.
+scroll_pattern = re.compile(
+    r"""Column\(\s*
+      children:\s*\[\s*
+        SingleChildScrollView\(\s*
+          controller:\s*_leftPaneScrollController,\s*
+          child:\s*Column\(\s*
+            key:\s*_childKey,\s*
+            children:\s*children,\s*
+          \),\s*
+        \),\s*
+        Expanded\(child:\s*Container\(\)\)\s*
+      \],\s*
+    \),""",
+    re.MULTILINE,
+)
+
+scroll_replacement = """Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _leftPaneScrollController,
+            child: Column(
+              key: _childKey,
+              children: children,
+            ),
+          ),
+        ),
+      ],
+    ),"""
+
+content, scroll_count = scroll_pattern.subn(
+    scroll_replacement,
+    content,
+    count=1,
+)
+print(
+    "Sol panel kaydırma düzeni iyileştirildi."
+    if scroll_count == 1
+    else "Sol panel kaydırma düzeni bulunamadı; mevcut yapı korundu."
+)
+
+# Kurulum/UAC bilgi kartını kompakt hâle getir.
+card_start = content.find("  Widget buildInstallCard(")
+card_end = content.find("  @override\n  void initState()", card_start)
+
+if card_start >= 0 and card_end > card_start:
+    card = content[card_start:card_end]
+    card = card.replace(
+        "double marginTop = 20.0,",
+        "double marginTop = 10.0,",
+        1,
+    )
+    card = card.replace(
+        "padding: EdgeInsets.all(20),",
+        "padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),",
+        1,
+    )
+    card = card.replace("fontSize: 15)", "fontSize: 14)", 1)
+    card = card.replace("height: 1.5,", "height: 1.35,", 1)
+    card = card.replace("fontSize: 13)", "fontSize: 12)", 1)
+    card = card.replace(
+        ").marginOnly(bottom: 20)",
+        ").marginOnly(bottom: 10)",
+        1,
+    )
+    card = card.replace("width: 150,", "width: 140,", 1)
+    card = card.replace("textSize: 20,", "textSize: 14,", 1)
+    card = card.replace("radius: 10,", "radius: 8,", 1)
+    content = content[:card_start] + card + content[card_end:]
+    print("Kurulum ve UAC bilgi kartı küçültüldü.")
+else:
+    print("Kurulum/UAC kartı bulunamadı; mevcut yapı korundu.")
+
 
 HOME_FILE.write_text(content, encoding="utf-8")
 
