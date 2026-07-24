@@ -291,10 +291,11 @@ new_logo = '''    Container(
       child: loadLogo(),
     ),'''
 
-if old_logo not in content:
-    raise RuntimeError("Logo yerleşimi bulunamadı.")
-
-content = content.replace(old_logo, new_logo, 1)
+if old_logo in content:
+    content = content.replace(old_logo, new_logo, 1)
+    print("Logo yerleşimi güncellendi.")
+else:
+    print("Logo yerleşimi mevcut tema tarafından değiştirilmiş; bu adım atlandı.")
 
 HOME_FILE.write_text(content, encoding="utf-8")
 
