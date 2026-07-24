@@ -1,0 +1,164 @@
+name: DyoDesk Windows x86 Legacy Derleme
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  LLVM_VERSION: "15.0.6"
+  VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  build-windows-x86:
+    name: Windows x86 Legacy
+    runs-on: windows-2022
+
+    steps:
+      - name: GitHub Actions cache değişkenlerini ayarla
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410
+        with:
+          script: |
+            core.exportVariable(
+              'ACTIONS_CACHE_URL',
+              process.env.ACTIONS_CACHE_URL || ''
+            );
+            core.exportVariable(
+              'ACTIONS_RUNTIME_TOKEN',
+              process.env.ACTIONS_RUNTIME_TOKEN || ''
+            );
+
+      - name: Kaynak kodu al
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          submodules: recursive
+
+      - name: 32-bit LLVM ve Clang kur
+        uses: rustdesk-org/install-llvm-action-32bit@6aa7d9ad3df84dff01cd4596dd0fc880a7f47fce
+        with:
+          version: ${{ env.LLVM_VERSION }}
+
+      - name: Rust x86 araç zincirini kur
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: nightly-2023-10-13-i686-pc-windows-msvc
+          targets: i686-pc-windows-msvc
+          components: rustfmt
+
+      - name: Rust önbelleğini aç
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          prefix-key: dyodesk-windows-x86-sciter
+
+      - name: vcpkg kur ve önbelleği aç
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: x86 vcpkg bağımlılıklarını kur
+        shell: bash
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: x86-windows-static
+        run: |
+          if ! "$VCPKG_ROOT/vcpkg" install \
+            --triplet x86-windows-static \
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "$VCPKG_ROOT" -name "*.log" | while read -r log; do
+              echo "$log"
+              echo "======"
+              cat "$log"
+              echo "======"
+            done
+            exit 1
+          fi
+
+      - name: DyoDesk çekirdek ayarlarını uygula
+        shell: powershell
+        env:
+          DYODESK_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          DYODESK_KEY: ${{ secrets.RS_PUB_KEY }}
+        run: |
+          python .\res\dyodesk_core_patch.py
+
+      - name: DyoDesk arayüz metinlerini uygula
+        shell: powershell
+        run: |
+          python .\res\dyodesk_ui_patch.py
+
+      - name: DyoDesk x86 Legacy marka ve temasını uygula
+        shell: powershell
+        run: |
+          python .\res\dyodesk_x86_legacy_patch.py
+
+      - name: DyoDesk x86 Legacy derle
+        shell: bash
+        env:
+          VCPKG_DEFAULT_HOST_TRIPLET: x86-windows-static
+        run: |
+          python3 res/inline-sciter.py
+
+          # RustDesk'in 32-bit Sciter dalını kullan.
+          sed -i 's/branch = "dyn"/branch = "dyn_x86"/g' Cargo.toml
+          cargo update -p sciter-rs \
+            --precise 674e07d3066ca9a92ced3816203ab6b652629d1e
+
+          cargo build \
+            --locked \
+            --features inline,vram,hwcodec \
+            --release \
+            --bins
+
+          mkdir -p DyoDesk-x86
+          mv target/release/rustdesk.exe DyoDesk-x86/DyoDesk.exe
+
+          curl -LJ \
+            -o DyoDesk-x86/sciter.dll \
+            https://github.com/c-smile/sciter-sdk/raw/master/bin.win/x32/sciter.dll
+
+          curl -LJ \
+            -o usbmmidd_v2.zip \
+            https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip
+
+          unzip usbmmidd_v2.zip
+
+          # 32-bit uygulama 64-bit Windows'ta sürücü işlemi yaparken
+          # deviceinstaller64.exe dosyasına ihtiyaç duyabilir.
+          rm -f usbmmidd_v2/deviceinstaller.exe
+          rm -f usbmmidd_v2/usbmmidd.bat
+          mv usbmmidd_v2 DyoDesk-x86/ || true
+
+      - name: x86 dosyalarını doğrula
+        shell: powershell
+        run: |
+          if (-not (Test-Path ".\DyoDesk-x86\DyoDesk.exe")) {
+            throw "DyoDesk x86 EXE oluşturulamadı."
+          }
+
+          if (-not (Test-Path ".\DyoDesk-x86\sciter.dll")) {
+            throw "32-bit sciter.dll bulunamadı."
+          }
+
+          $bytes = [System.IO.File]::ReadAllBytes(
+            ".\DyoDesk-x86\DyoDesk.exe"
+          )
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+
+          if ($machine -ne 0x014c) {
+            throw "Oluşan dosya x86 değil. PE Machine: $machine"
+          }
+
+          Write-Host "DyoDesk x86 Legacy doğrulandı."
+
+      - name: DyoDesk x86 artifact yükle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dyodesk-windows-x86-legacy
+          path: DyoDesk-x86
+          retention-days: 14
