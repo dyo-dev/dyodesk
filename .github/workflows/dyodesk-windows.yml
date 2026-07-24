@@ -161,11 +161,6 @@ jobs:
         run: |
           python .\res\dyodesk_theme_patch.py
       
-      - name: DyoDesk modern ana ekranını uygula
-        shell: powershell
-        run: |
-          python .\res\dyodesk_modern_home_patch.py
-      
       - name: DyoDesk'i derle
         shell: powershell
         run: |
