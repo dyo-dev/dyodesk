@@ -32,8 +32,7 @@ VIAddVersionKey "FileVersion" "1.0.0"
 VIAddVersionKey "ProductVersion" "1.0.0"
 VIAddVersionKey "LegalCopyright" "Dyo Bilgi Sistemleri"
 
-InstallDir "$PROGRAMFILES64\DyoDesk"
-InstallDirRegKey HKLM "Software\Dyo Bilgi Sistemleri\DyoDesk" "InstallPath"
+InstallDir "$PROGRAMFILES\DyoDesk"
 
 ShowInstDetails show
 ShowUninstDetails show
@@ -50,6 +49,7 @@ Var InstallButton
 Var Mode
 Var ResultCode
 Var ServiceName
+Var ArchitectureText
 
 Page custom ModePageCreate
 !insertmacro MUI_PAGE_INSTFILES
@@ -66,7 +66,35 @@ Function IsElevated
 FunctionEnd
 
 
+Function SetArchitecture
+  ${If} ${RunningX64}
+    SetRegView 64
+    StrCpy $INSTDIR "$PROGRAMFILES64\DyoDesk"
+    StrCpy $ArchitectureText "64-bit"
+  ${Else}
+    SetRegView 32
+    StrCpy $INSTDIR "$PROGRAMFILES\DyoDesk"
+    StrCpy $ArchitectureText "32-bit Legacy"
+  ${EndIf}
+FunctionEnd
+
+
+Function un.SetArchitecture
+  ${If} ${RunningX64}
+    SetRegView 64
+    StrCpy $INSTDIR "$PROGRAMFILES64\DyoDesk"
+    StrCpy $ArchitectureText "64-bit"
+  ${Else}
+    SetRegView 32
+    StrCpy $INSTDIR "$PROGRAMFILES\DyoDesk"
+    StrCpy $ArchitectureText "32-bit Legacy"
+  ${EndIf}
+FunctionEnd
+
+
 Function .onInit
+  Call SetArchitecture
+
   ${GetParameters} $0
   ${GetOptions} $0 "/MODE=" $Mode
 
@@ -104,7 +132,7 @@ Function ModePageCreate
   SendMessage $0 ${WM_SETFONT} $1 1
 
   ${NSD_CreateLabel} 0 22u 100% 20u \
-    "Geçici kullanım için kurulumsuz çalıştırın veya sürekli erişim için bilgisayara kurun."
+    "Sisteminiz için $ArchitectureText DyoDesk otomatik seçildi."
   Pop $0
 
   ${NSD_CreateButton} 0 48u 100% 26u "Kurulumsuz Çalıştır"
@@ -112,7 +140,7 @@ Function ModePageCreate
   ${NSD_OnClick} $PortableButton PortableClicked
 
   ${NSD_CreateLabel} 4u 76u 96% 18u \
-    "Teknisyen kullanımı: hizmet, kısayol ve kaldırma kaydı oluşturmaz."
+    "Geçici kullanım: hizmet, kısayol ve kaldırma kaydı oluşturmaz."
   Pop $0
 
   ${NSD_CreateButton} 0 100u 100% 26u "Bu Bilgisayara Kur"
@@ -142,7 +170,6 @@ Function InstallClicked
     ExecShell "runas" "$EXEPATH" "/MODE=install"
 
     IfErrors InstallElevationFailed
-
     Quit
 
     InstallElevationFailed:
@@ -156,31 +183,36 @@ Function InstallClicked
 FunctionEnd
 
 
-Function ExtractX64Payload
+Function ExtractSelectedPayload
   InitPluginsDir
   SetOutPath "$PLUGINSDIR\DyoDesk"
-  File /r "${PROJECT_ROOT}\packaging\payload\x64\*.*"
+
+  ${If} ${RunningX64}
+    File /r "${PROJECT_ROOT}\packaging\payload\x64\*.*"
+  ${Else}
+    File /r "${PROJECT_ROOT}\packaging\payload\x86\*.*"
+  ${EndIf}
 FunctionEnd
 
 
-Function InstallX64Payload
+Function InstallSelectedPayload
   SetOutPath "$INSTDIR"
-  File /r "${PROJECT_ROOT}\packaging\payload\x64\*.*"
+
+  ${If} ${RunningX64}
+    File /r "${PROJECT_ROOT}\packaging\payload\x64\*.*"
+  ${Else}
+    File /r "${PROJECT_ROOT}\packaging\payload\x86\*.*"
+  ${EndIf}
 FunctionEnd
 
 
 Function RunPortable
-  ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP|MB_OK \
-      "Bu test paketinde henüz Windows 32-bit istemcisi bulunmuyor.$\r$\n$\r$\n32-bit Legacy sürüm sonraki aşamada aynı DyoDesk.exe dosyasına eklenecek."
-    Quit
-  ${EndIf}
-
-  DetailPrint "DyoDesk kurulumsuz hazırlanıyor..."
-  Call ExtractX64Payload
+  DetailPrint "$ArchitectureText DyoDesk kurulumsuz hazırlanıyor..."
+  Call ExtractSelectedPayload
 
   IfFileExists "$PLUGINSDIR\DyoDesk\DyoDesk.exe" +3 0
-    MessageBox MB_ICONSTOP|MB_OK "DyoDesk.exe paket içinde bulunamadı."
+    MessageBox MB_ICONSTOP|MB_OK \
+      "DyoDesk.exe seçilen mimari paketinde bulunamadı."
     Quit
 
   HideWindow
@@ -198,14 +230,13 @@ Function FindAndStartService
 
   ${If} $ResultCode != 0
     StrCpy $ServiceName "RustDesk"
-
     nsExec::ExecToLog '"$SYSDIR\sc.exe" query RustDesk'
     Pop $ResultCode
   ${EndIf}
 
   ${If} $ResultCode != 0
     MessageBox MB_ICONEXCLAMATION|MB_OK \
-      "DyoDesk dosyaları kuruldu ancak Windows hizmeti oluşturulamadı.$\r$\n$\r$\nKurulum günlüğünü kontrol edeceğiz."
+      "DyoDesk dosyaları kuruldu ancak Windows hizmeti oluşturulamadı."
     Return
   ${EndIf}
 
@@ -220,29 +251,19 @@ FunctionEnd
 
 
 Function InstallDyoDesk
-  ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP|MB_OK \
-      "Bu test paketinde henüz Windows 32-bit istemcisi bulunmuyor.$\r$\n$\r$\n32-bit Legacy sürüm hazırlandığında otomatik olarak eklenecek."
-    Quit
-  ${EndIf}
-
-  SetRegView 64
+  Call SetArchitecture
   SetShellVarContext all
-  StrCpy $INSTDIR "$PROGRAMFILES64\DyoDesk"
 
-  DetailPrint "Eski DyoDesk işlemleri durduruluyor..."
+  DetailPrint "Eski DyoDesk hizmetleri durduruluyor..."
   nsExec::ExecToLog '"$SYSDIR\sc.exe" stop DyoDesk'
   Pop $ResultCode
   nsExec::ExecToLog '"$SYSDIR\sc.exe" stop RustDesk'
   Pop $ResultCode
-  ; Kurulum dosyasının adı da DyoDesk.exe olduğu için burada
-  ; taskkill /IM DyoDesk.exe kullanılamaz; başlatıcı kendini kapatır.
   Sleep 1000
-  DetailPrint "Eski DyoDesk hizmetleri durduruldu."
 
-  DetailPrint "DyoDesk dosyaları $INSTDIR klasörüne kuruluyor..."
+  DetailPrint "$ArchitectureText DyoDesk $INSTDIR klasörüne kuruluyor..."
   CreateDirectory "$INSTDIR"
-  Call InstallX64Payload
+  Call InstallSelectedPayload
 
   IfFileExists "$INSTDIR\DyoDesk.exe" InstallFilesReady 0
     MessageBox MB_ICONSTOP|MB_OK \
@@ -254,30 +275,15 @@ Function InstallDyoDesk
   WriteUninstaller "$INSTDIR\DyoDeskKaldir.exe"
 
   CreateDirectory "$SMPROGRAMS\DyoDesk"
-
   Delete "$SMPROGRAMS\DyoDesk\DyoDesk.lnk"
   Delete "$DESKTOP\DyoDesk.lnk"
 
-  IfFileExists "$INSTDIR\data\flutter_assets\assets\icon.ico" 0 UseExeIcon
-
-  CreateShortcut "$SMPROGRAMS\DyoDesk\DyoDesk.lnk" \
-    "$INSTDIR\DyoDesk.exe" "" \
-    "$INSTDIR\data\flutter_assets\assets\icon.ico" 0
-
-  CreateShortcut "$DESKTOP\DyoDesk.lnk" \
-    "$INSTDIR\DyoDesk.exe" "" \
-    "$INSTDIR\data\flutter_assets\assets\icon.ico" 0
-
-  Goto ShortcutsReady
-
-  UseExeIcon:
   CreateShortcut "$SMPROGRAMS\DyoDesk\DyoDesk.lnk" \
     "$INSTDIR\DyoDesk.exe" "" "$INSTDIR\DyoDesk.exe" 0
 
   CreateShortcut "$DESKTOP\DyoDesk.lnk" \
     "$INSTDIR\DyoDesk.exe" "" "$INSTDIR\DyoDesk.exe" 0
 
-  ShortcutsReady:
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 
   WriteRegStr HKLM "Software\Dyo Bilgi Sistemleri\DyoDesk" \
@@ -289,7 +295,7 @@ Function InstallDyoDesk
 
   WriteRegStr HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
-    "DisplayIcon" "$INSTDIR\data\flutter_assets\assets\icon.ico"
+    "DisplayIcon" "$INSTDIR\DyoDesk.exe"
 
   WriteRegStr HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
@@ -306,6 +312,10 @@ Function InstallDyoDesk
   WriteRegStr HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
     "Version" "1.0.0"
+
+  WriteRegStr HKLM \
+    "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
+    "Architecture" "$ArchitectureText"
 
   WriteRegStr HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
@@ -333,7 +343,7 @@ Function InstallDyoDesk
   Call FindAndStartService
 
   MessageBox MB_ICONINFORMATION|MB_OK \
-    "DyoDesk kurulumu tamamlandı.$\r$\n$\r$\nProgram Files, masaüstü kısayolu ve Windows hizmeti hazırlandı."
+    "DyoDesk kurulumu tamamlandı.$\r$\n$\r$\n$ArchitectureText istemci ve Windows hizmeti hazırlandı."
 
   Exec '"$INSTDIR\DyoDesk.exe"'
   Quit
@@ -353,6 +363,7 @@ SectionEnd
 
 
 Function un.onInit
+  Call un.SetArchitecture
   System::Call 'shell32::IsUserAnAdmin() i .r0'
 
   ${If} $0 == 0
@@ -363,7 +374,7 @@ FunctionEnd
 
 
 Section "Uninstall"
-  SetRegView 64
+  Call un.SetArchitecture
   SetShellVarContext all
 
   nsExec::ExecToLog '"$SYSDIR\sc.exe" stop DyoDesk'
