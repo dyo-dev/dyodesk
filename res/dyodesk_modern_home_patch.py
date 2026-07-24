@@ -88,6 +88,85 @@ def matching_brace(text: str, open_index: int) -> int:
     raise RuntimeError("Kapanış süslü parantezi bulunamadı.")
 
 
+
+def matching_parenthesis(text: str, open_index: int) -> int:
+    depth = 0
+    i = open_index
+    quote = None
+    triple = False
+    line_comment = False
+    block_comment = False
+
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+        nxt2 = text[i + 2] if i + 2 < len(text) else ""
+
+        if line_comment:
+            if ch == "\n":
+                line_comment = False
+            i += 1
+            continue
+
+        if block_comment:
+            if ch == "*" and nxt == "/":
+                block_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+
+        if quote is not None:
+            if triple:
+                if ch == quote and nxt == quote and nxt2 == quote:
+                    quote = None
+                    triple = False
+                    i += 3
+                    continue
+                i += 1
+                continue
+
+            if ch == "\\":
+                i += 2
+                continue
+
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+
+        if ch == "/" and nxt == "/":
+            line_comment = True
+            i += 2
+            continue
+
+        if ch == "/" and nxt == "*":
+            block_comment = True
+            i += 2
+            continue
+
+        if ch in ("'", '"'):
+            if nxt == ch and nxt2 == ch:
+                quote = ch
+                triple = True
+                i += 3
+                continue
+            quote = ch
+            triple = False
+            i += 1
+            continue
+
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+
+        i += 1
+
+    raise RuntimeError("Kapanış normal parantezi bulunamadı.")
+
 def replace_method(
     text: str,
     class_marker: str,
@@ -103,9 +182,14 @@ def replace_method(
     if method_start < 0:
         raise RuntimeError(f"{description}: metot bulunamadı.")
 
-    open_brace = text.find("{", method_start)
+    params_open = text.find("(", method_start)
+    if params_open < 0:
+        raise RuntimeError(f"{description}: parametre başlangıcı bulunamadı.")
+
+    params_close = matching_parenthesis(text, params_open)
+    open_brace = text.find("{", params_close)
     if open_brace < 0:
-        raise RuntimeError(f"{description}: açılış parantezi bulunamadı.")
+        raise RuntimeError(f"{description}: metot gövdesi bulunamadı.")
 
     method_end = matching_brace(text, open_brace) + 1
     return text[:method_start] + replacement + text[method_end:]
@@ -687,7 +771,7 @@ home = replace_method(
 )
 
 right_pane = r'''buildRightPane(BuildContext context) {
-    return const ConnectionPage();
+    return ConnectionPage();
   }'''
 
 home = replace_method(
@@ -875,8 +959,8 @@ connection_build = r'''Widget build(BuildContext context) {
                         ),
                       ],
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.fromLTRB(14, 10, 14, 8),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
                       child: PeerTabPage(),
                     ),
                   ),
