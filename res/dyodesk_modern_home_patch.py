@@ -1,6 +1,4 @@
 from pathlib import Path
-import re
-
 
 HOME_FILE = Path(
     "flutter/lib/desktop/pages/desktop_home_page.dart"
@@ -12,51 +10,66 @@ if not HOME_FILE.exists():
     )
 
 content = HOME_FILE.read_text(encoding="utf-8")
+content = content.replace("\r\n", "\n")
 
 
-def replace_once(
-    pattern: str,
+def replace_section(
+    start_marker: str,
+    end_marker: str,
     replacement: str,
     description: str,
-    flags: int = re.MULTILINE | re.DOTALL,
 ) -> None:
     global content
 
-    updated, count = re.subn(
-        pattern,
-        replacement,
-        content,
-        count=1,
-        flags=flags,
-    )
-
-    if count != 1:
+    start = content.find(start_marker)
+    if start < 0:
         raise RuntimeError(
-            f"{description} değiştirilemedi. "
-            f"Eşleşme sayısı: {count}"
+            f"{description} başlangıcı bulunamadı."
         )
 
-    content = updated
+    end = content.find(end_marker, start)
+    if end < 0:
+        raise RuntimeError(
+            f"{description} bitişi bulunamadı."
+        )
+
+    content = (
+        content[:start]
+        + replacement
+        + "\n\n"
+        + content[end:]
+    )
 
 
-replace_once(
-    r'''@override\s+
-Widget build\(BuildContext context\)\s*\{\s*
-super\.build\(context\);\s*
-final isIncomingOnly = bind\.isIncomingOnly\(\);\s*
-return _buildBlock\(\s*
-child: Row\(\s*
-crossAxisAlignment: CrossAxisAlignment\.start,\s*
-children: \[\s*
-buildLeftPane\(context\),\s*
-if \(!isIncomingOnly\) const VerticalDivider\(width: 1\),\s*
-if \(!isIncomingOnly\)\s*
-Expanded\(child: buildRightPane\(context\)\),\s*
-\],\s*
-\),\s*
-\);\s*
-\}''',
-    '''@override
+if "_buildDyoDeskTopBar" in content:
+    print("DyoDesk modern ana ekranı zaten uygulanmış.")
+    raise SystemExit(0)
+
+
+build_start = content.find(
+    "  @override\n  Widget build(BuildContext context) {"
+)
+if build_start < 0:
+    build_start = content.find(
+        "@override\n  Widget build(BuildContext context) {"
+    )
+
+if build_start < 0:
+    raise RuntimeError(
+        "Modern ana pencere düzeninin başlangıcı bulunamadı."
+    )
+
+build_end_marker = (
+    "  Widget _buildBlock({required Widget child}) {"
+)
+build_end = content.find(build_end_marker, build_start)
+
+if build_end < 0:
+    raise RuntimeError(
+        "Modern ana pencere düzeninin bitişi bulunamadı."
+    )
+
+modern_build = '''  @override
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
@@ -184,19 +197,35 @@ Expanded\(child: buildRightPane\(context\)\),\s*
         ],
       ),
     );
-  }''',
-    "Modern ana pencere düzeni",
+  }'''
+
+content = (
+    content[:build_start]
+    + modern_build
+    + "\n\n"
+    + content[build_end:]
 )
 
 
-replace_once(
-    r'''return ChangeNotifierProvider\.value\(\s*
-value: gFFI\.serverModel,\s*
-child: Container\(\s*
-width: isIncomingOnly \? 280\.0 : [0-9.]+,\s*
-color: Theme\.of\(context\)\.colorScheme\.background,\s*
-child: Stack\(''',
-    '''return ChangeNotifierProvider.value(
+left_method = content.find(
+    "  Widget buildLeftPane(BuildContext context) {"
+)
+if left_method < 0:
+    raise RuntimeError("Sol bilgi kartı metodu bulunamadı.")
+
+provider_start = content.find(
+    "    return ChangeNotifierProvider.value(",
+    left_method,
+)
+stack_marker = "        child: Stack("
+stack_start = content.find(stack_marker, provider_start)
+
+if provider_start < 0 or stack_start < 0:
+    raise RuntimeError("Sol bilgi kartı bölümü bulunamadı.")
+
+stack_end = stack_start + len(stack_marker)
+
+left_replacement = '''    return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
         width: isIncomingOnly ? 310.0 : 300.0,
@@ -215,19 +244,19 @@ child: Stack\(''',
             ),
           ],
         ),
-        child: Stack(''',
-    "Sol bilgi kartı",
+        child: Stack('''
+
+content = (
+    content[:provider_start]
+    + left_replacement
+    + content[stack_end:]
 )
 
 
-replace_once(
-    r'''buildRightPane\(BuildContext context\)\s*\{\s*
-return Container\(\s*
-color: Theme\.of\(context\)\.scaffoldBackgroundColor,\s*
-child: ConnectionPage\(\),\s*
-\);\s*
-\}''',
-    '''buildRightPane(BuildContext context) {
+replace_section(
+    "  buildRightPane(BuildContext context) {",
+    "  buildIDBoard(BuildContext context) {",
+    '''  buildRightPane(BuildContext context) {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -251,14 +280,21 @@ child: ConnectionPage\(\),\s*
 )
 
 
-content = content.replace(
-    "Align(\n        alignment: Alignment.center,\n        child: loadLogo(),\n      ),",
-    '''Container(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 4),
-        alignment: Alignment.centerLeft,
-        child: loadLogo(),
-      ),''',
-)
+old_logo = '''    Align(
+      alignment: Alignment.center,
+      child: loadLogo(),
+    ),'''
+
+new_logo = '''    Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 4),
+      alignment: Alignment.centerLeft,
+      child: loadLogo(),
+    ),'''
+
+if old_logo not in content:
+    raise RuntimeError("Logo yerleşimi bulunamadı.")
+
+content = content.replace(old_logo, new_logo, 1)
 
 HOME_FILE.write_text(content, encoding="utf-8")
 
