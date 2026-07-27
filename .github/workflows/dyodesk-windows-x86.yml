@@ -107,6 +107,10 @@ jobs:
           sed -i 's/branch = "dyn"/branch = "dyn_x86"/g' Cargo.toml
           cargo update -p sciter-rs \
             --precise 674e07d3066ca9a92ced3816203ab6b652629d1e
+          
+          # Önbellekteki eski RustDesk ikon kaynağını temizle.
+          cargo clean -p rustdesk
+          touch build.rs res/icon.ico
 
           cargo build \
             --locked \
