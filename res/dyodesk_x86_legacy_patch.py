@@ -3,6 +3,7 @@ import base64
 import re
 import shutil
 
+
 ICON_ICO = Path("res/dyodesk_icon.ico")
 ICON_PNG = Path("res/dyodesk_icon.png")
 
@@ -12,8 +13,7 @@ TARGET_PNG = Path("res/icon.png")
 COMMON_CSS = Path("src/ui/common.css")
 INDEX_CSS = Path("src/ui/index.css")
 INDEX_TIS = Path("src/ui/index.tis")
-
-CONFIG_RS = Path("libs/hbb_common/src/config.rs")
+UI_RS = Path("src/ui.rs")
 
 
 for required in (
@@ -22,13 +22,15 @@ for required in (
     COMMON_CSS,
     INDEX_CSS,
     INDEX_TIS,
-    CONFIG_RS,
+    UI_RS,
 ):
     if not required.exists():
-        raise FileNotFoundError(f"Dosya bulunamadı: {required}")
+        raise FileNotFoundError(
+            f"Dosya bulunamadı: {required}"
+        )
 
 
-# EXE ve standart uygulama ikonlarını değiştir.
+# Standart uygulama ve EXE ikonlarını değiştir.
 shutil.copy2(ICON_ICO, TARGET_ICO)
 shutil.copy2(ICON_PNG, TARGET_PNG)
 
@@ -51,13 +53,14 @@ def replace_once_or_keep(
 
     if count == 0:
         print(
-            f"UYARI: {description} için eski ifade bulunamadı, "
-            "işlem atlandı."
+            f"UYARI: {description} için eski ifade "
+            "bulunamadı, işlem atlandı."
         )
         return content
 
     raise RuntimeError(
-        f"{description} değiştirilemedi. Eşleşme sayısı: {count}"
+        f"{description} değiştirilemedi. "
+        f"Eşleşme sayısı: {count}"
     )
 
 
@@ -88,7 +91,10 @@ common = replace_once_or_keep(
     "DyoDesk menü rengi",
 )
 
-COMMON_CSS.write_text(common, encoding="utf-8")
+COMMON_CSS.write_text(
+    common,
+    encoding="utf-8",
+)
 
 
 # ---------------------------------------------------------
@@ -97,8 +103,6 @@ COMMON_CSS.write_text(common, encoding="utf-8")
 
 index_css = INDEX_CSS.read_text(encoding="utf-8")
 
-# .left-pane içindeki mevcut width değerini,
-# dosyanın boşluk biçiminden bağımsız değiştir.
 left_pane_pattern = re.compile(
     r"(\.left-pane\s*\{[^{}]*?\bwidth\s*:\s*)"
     r"\d+(?:\.\d+)?px"
@@ -123,11 +127,13 @@ if width_count == 0:
     )
 
     print(
-        "Sol panel width tanımı bulunamadı; "
+        "Sol panel genişliği bulunamadı; "
         "240px CSS override eklendi."
     )
 else:
-    print("Sol panel genişliği 240px olarak ayarlandı.")
+    print(
+        "Sol panel genişliği 240px olarak ayarlandı."
+    )
 
 
 index_css = replace_once_or_keep(
@@ -137,11 +143,14 @@ index_css = replace_once_or_keep(
     "Kurulum kartı renkleri",
 )
 
-INDEX_CSS.write_text(index_css, encoding="utf-8")
+INDEX_CSS.write_text(
+    index_css,
+    encoding="utf-8",
+)
 
 
 # ---------------------------------------------------------
-# Telif ve arayüz metni
+# Telif metni
 # ---------------------------------------------------------
 
 index_tis = INDEX_TIS.read_text(encoding="utf-8")
@@ -151,11 +160,16 @@ index_tis = index_tis.replace(
     "Copyright © 2026 Dyo Bilgi Sistemleri",
 )
 
-INDEX_TIS.write_text(index_tis, encoding="utf-8")
+INDEX_TIS.write_text(
+    index_tis,
+    encoding="utf-8",
+)
 
 
 # ---------------------------------------------------------
-# Windows x86 Sciter pencere başlığı ikonu
+# x86 Sciter pencere başlığı ikonu
+# src/ui.rs içindeki get_icon() fonksiyonunun
+# Windows/Linux için kullanılan gömülü PNG'sini değiştirir.
 # ---------------------------------------------------------
 
 icon_base64 = base64.b64encode(
@@ -166,50 +180,55 @@ icon_data_uri = (
     f"data:image/png;base64,{icon_base64}"
 )
 
-config_rs = CONFIG_RS.read_text(encoding="utf-8")
+ui_rs = UI_RS.read_text(encoding="utf-8")
 
-# Sadece #[cfg(windows)] altında bulunan ICON sabitini değiştirir.
-# macOS ve Linux ikonlarına dokunmaz.
-windows_icon_pattern = re.compile(
+sciter_icon_pattern = re.compile(
     r'('
+    r'pub\s+fn\s+get_icon\(\)\s*->\s*String\s*\{'
+    r'.*?'
     r'#\[cfg\('
-    r'(?:windows|target_os\s*=\s*"windows")'
-    r'\)\]'
+    r'not\('
+    r'target_os\s*=\s*"macos"'
+    r'\)'
+    r'\)'
+    r'\]'
     r'[^\r\n]*'
-    r'\r?\n'
-    r'\s*pub\s+const\s+ICON\s*:\s*'
-    r"&(?:'static\s+)?str"
-    r'\s*=\s*"'
+    r'\s*\{'
+    r'\s*"'
     r')'
-    r'data:image/png;base64,[^"]*'
-    r'(";)'
-    ,
+    r'data:image/png;base64,[^"]+'
+    r'('
+    r'"\s*\.\s*'
+    r'(?:into|to_owned)'
+    r'\s*\(\s*\)'
+    r')',
     re.IGNORECASE | re.DOTALL,
 )
 
-config_rs, icon_count = windows_icon_pattern.subn(
+ui_rs, icon_count = sciter_icon_pattern.subn(
     lambda match: (
         f"{match.group(1)}"
         f"{icon_data_uri}"
         f"{match.group(2)}"
     ),
-    config_rs,
+    ui_rs,
     count=1,
 )
 
 if icon_count != 1:
     raise RuntimeError(
-        "Windows x86 Sciter pencere ikonu değiştirilemedi. "
+        "src/ui.rs içindeki x86 Sciter ikonu "
+        "değiştirilemedi. "
         f"Eşleşme sayısı: {icon_count}"
     )
 
-CONFIG_RS.write_text(
-    config_rs,
+UI_RS.write_text(
+    ui_rs,
     encoding="utf-8",
 )
 
 print(
-    "Windows x86 Sciter pencere ikonu "
+    "x86 Sciter pencere ikonu "
     "DyoDesk logosuyla değiştirildi."
 )
 
