@@ -3,7 +3,7 @@ import base64
 import re
 import shutil
 
-
+TARGET_TRAY_ICO = Path("res/tray-icon.ico")
 ICON_ICO = Path("res/dyodesk_icon.ico")
 ICON_PNG = Path("res/dyodesk_icon.png")
 
@@ -32,8 +32,8 @@ for required in (
 
 # Standart uygulama ve EXE ikonlarını değiştir.
 shutil.copy2(ICON_ICO, TARGET_ICO)
+shutil.copy2(ICON_ICO, TARGET_TRAY_ICO)
 shutil.copy2(ICON_PNG, TARGET_PNG)
-
 
 def replace_once_or_keep(
     content: str,
