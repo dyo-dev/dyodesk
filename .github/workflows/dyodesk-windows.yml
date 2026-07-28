@@ -160,7 +160,25 @@ jobs:
         shell: powershell
         run: |
           python .\res\dyodesk_theme_patch.py
-      
+
+      - name: DyoDesk Windows ikonlarını uygula
+        shell: powershell
+        run: |
+          Copy-Item `
+            ".\res\dyodesk_icon.png" `
+            ".\flutter\assets\icon.png" `
+            -Force
+
+          Copy-Item `
+            ".\res\dyodesk_icon.ico" `
+            ".\res\tray-icon.ico" `
+            -Force
+
+          Copy-Item `
+            ".\res\dyodesk_icon.ico" `
+            ".\flutter\windows\runner\resources\app_icon.ico" `
+            -Force
+            
       - name: DyoDesk'i derle
         shell: powershell
         run: |
