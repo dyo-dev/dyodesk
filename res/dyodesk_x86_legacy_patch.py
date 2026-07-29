@@ -23,7 +23,6 @@ for required in (
     INDEX_CSS,
     INDEX_TIS,
     UI_RS,
-    CONFIG_RS,
 ):
     if not required.exists():
         raise FileNotFoundError(
