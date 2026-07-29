@@ -14,7 +14,6 @@ COMMON_CSS = Path("src/ui/common.css")
 INDEX_CSS = Path("src/ui/index.css")
 INDEX_TIS = Path("src/ui/index.tis")
 UI_RS = Path("src/ui.rs")
-CONFIG_RS = Path("libs/hbb_common/src/config.rs")
 
 
 for required in (
@@ -209,64 +208,6 @@ INDEX_TIS.write_text(
 
 print("x86 DyoDesk'i Kur butonu kaldırıldı.")
 print(f"Kaldırılan kurulum olayı sayısı: {event_count}")
-
-# ---------------------------------------------------------
-# x86 bağlantılarında uzak imleci varsayılan açık yap
-# ---------------------------------------------------------
-
-config_rs = CONFIG_RS.read_text(encoding="utf-8")
-
-# Yeni bağlantılarda varsayılan açık olsun.
-default_cursor_pattern = re.compile(
-    r'(\bshow_remote_cursor\s*:\s*)'
-    r'Default::default\(\)'
-    r'(\s*,)'
-)
-
-config_rs, default_cursor_count = default_cursor_pattern.subn(
-    r'\1ShowRemoteCursor { v: true }\2',
-    config_rs,
-)
-
-if default_cursor_count != 1:
-    raise RuntimeError(
-        "Yeni bağlantılar için uzak imleç varsayılanı "
-        "değiştirilemedi. "
-        f"Eşleşme sayısı: {default_cursor_count}"
-    )
-
-
-# Daha önce kayıtlı bağlantılarda da her açılışta etkinleştir.
-loaded_cursor_pattern = re.compile(
-    r'(let\s+mut\s+config\s*:\s*'
-    r'PeerConfig\s*=\s*config\s*;)'
-)
-
-config_rs, loaded_cursor_count = loaded_cursor_pattern.subn(
-    (
-        r'\1'
-        '\n'
-        '                config.show_remote_cursor.v = true;'
-    ),
-    config_rs,
-)
-
-if loaded_cursor_count != 1:
-    raise RuntimeError(
-        "Kayıtlı bağlantılar için uzak imleç ayarı "
-        "uygulanamadı. "
-        f"Eşleşme sayısı: {loaded_cursor_count}"
-    )
-
-CONFIG_RS.write_text(
-    config_rs,
-    encoding="utf-8",
-)
-
-print(
-    "x86 bağlantılarında uzak imleç gösterimi "
-    "varsayılan olarak açıldı."
-)
 
 # ---------------------------------------------------------
 # x86 Sciter pencere başlığı ikonu
