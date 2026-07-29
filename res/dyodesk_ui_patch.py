@@ -106,6 +106,12 @@ translations = {
         "Henüz bağlantı geçmişi yok.\\n"
         "Yeni bir bağlantı başlatın."
     ),
+    "install_tip": (
+    "Kullanıcı Hesabı Denetimi ve yönetici işlemlerinin düzgün "
+    "çalışması için DyoDesk'in sistem seviyesinde kurulması gerekir. "
+    "Kurulum yapmak için DyoDesk.exe dosyasını yeniden çalıştırıp "
+    "Kur seçeneğini kullanın."
+),
 }
 
 for translation_key, translation_value in translations.items():
