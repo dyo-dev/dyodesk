@@ -160,11 +160,53 @@ index_tis = index_tis.replace(
     "Copyright © 2026 Dyo Bilgi Sistemleri",
 )
 
+# UAC uyarı metnini bırakır, yalnızca
+# x86 Sciter arayüzündeki "DyoDesk'i Kur" butonunu kaldırır.
+install_button_pattern = re.compile(
+    r'\s*'
+    r'<div>\s*'
+    r'<button\b[^>]*#install-me[^>]*>\s*'
+    r'\{?\s*translate\(\s*[\'"]Install[\'"]\s*\)\s*\}?\s*'
+    r'</button>\s*'
+    r'</div>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+index_tis, button_count = install_button_pattern.subn(
+    "",
+    index_tis,
+    count=1,
+)
+
+if button_count != 1:
+    raise RuntimeError(
+        "x86 DyoDesk'i Kur butonu kaldırılamadı. "
+        f"Eşleşme sayısı: {button_count}"
+    )
+
+# Artık buton olmadığı için tıklama olayını da kaldır.
+install_event_pattern = re.compile(
+    r'\s*event\s+click\s+'
+    r'\$\(\s*#install-me\s*\)\s*'
+    r'\{\s*'
+    r'handler\.goto_install\(\s*\)\s*;\s*'
+    r'\}',
+    re.IGNORECASE | re.DOTALL,
+)
+
+index_tis, event_count = install_event_pattern.subn(
+    "",
+    index_tis,
+    count=1,
+)
+
 INDEX_TIS.write_text(
     index_tis,
     encoding="utf-8",
 )
 
+print("x86 DyoDesk'i Kur butonu kaldırıldı.")
+print(f"Kaldırılan kurulum olayı sayısı: {event_count}")
 
 # ---------------------------------------------------------
 # x86 Sciter pencere başlığı ikonu
