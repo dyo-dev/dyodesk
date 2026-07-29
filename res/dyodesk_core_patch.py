@@ -150,6 +150,11 @@ config2_injection = (
             "key".to_owned(),
             "{safe_key}".to_owned(),
         );
+        
+        config.options.insert(
+            "show-remote-cursor".to_owned(),
+            "Y".to_owned(),
+        );
 
         config.rendezvous_server =
             "{safe_id_server}".to_owned();
