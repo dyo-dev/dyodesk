@@ -1,0 +1,319 @@
+name: DyoDesk Android APK Derleme
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RUST_VERSION: "1.75"
+  CARGO_NDK_VERSION: "3.1.2"
+  ANDROID_FLUTTER_VERSION: "3.24.5"
+  NDK_VERSION: "r28c"
+  VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+
+jobs:
+  generate-bridge:
+    uses: ./.github/workflows/bridge.yml
+
+  build-native-libs:
+    name: Android native ${{ matrix.arch }}
+    needs: generate-bridge
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            target: aarch64-linux-android
+            android_abi: arm64-v8a
+            ndk_script: ndk_arm64.sh
+          - arch: armv7
+            target: armv7-linux-androideabi
+            android_abi: armeabi-v7a
+            ndk_script: ndk_arm.sh
+
+    steps:
+      - name: Disk alanı aç
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          tool-cache: false
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: false
+
+      - name: GitHub Actions cache değişkenlerini ayarla
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410
+        with:
+          script: |
+            core.exportVariable(
+              'ACTIONS_CACHE_URL',
+              process.env.ACTIONS_CACHE_URL || ''
+            );
+            core.exportVariable(
+              'ACTIONS_RUNTIME_TOKEN',
+              process.env.ACTIONS_RUNTIME_TOKEN || ''
+            );
+
+      - name: Gerekli Ubuntu paketlerini kur
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            curl \
+            gcc-multilib \
+            git \
+            g++ \
+            g++-multilib \
+            libc6-dev \
+            libclang-dev \
+            libunwind-dev \
+            llvm-dev \
+            nasm \
+            ninja-build \
+            openjdk-17-jdk-headless \
+            pkg-config \
+            tree \
+            wget
+
+      - name: Kaynak kodu al
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          submodules: recursive
+
+      - name: Android NDK kur
+        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779
+        id: setup-ndk
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: true
+
+      - name: vcpkg kur ve önbelleği aç
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
+        with:
+          vcpkgDirectory: /opt/artifacts/vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Android vcpkg bağımlılıklarını kur
+        shell: bash
+        run: |
+          if ! ./flutter/build_android_deps.sh "${{ matrix.android_abi }}"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r log; do
+              echo "$log"
+              echo "======"
+              cat "$log"
+              echo "======"
+            done
+            exit 1
+          fi
+
+      - name: Bridge dosyalarını indir
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: Rust kur
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+          targets: ${{ matrix.target }}
+
+      - name: Rust önbelleğini aç
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          prefix-key: dyodesk-android-native
+          key: ${{ matrix.target }}
+
+      - name: DyoDesk çekirdek ayarlarını uygula
+        env:
+          DYODESK_SERVER: ${{ secrets.RENDEZVOUS_SERVER }}
+          DYODESK_KEY: ${{ secrets.RS_PUB_KEY }}
+        shell: bash
+        run: |
+          python3 ./res/dyodesk_core_patch.py
+
+      - name: DyoDesk arayüz metinlerini uygula
+        shell: bash
+        run: |
+          python3 ./res/dyodesk_ui_patch.py
+
+      - name: Android native kütüphanesini derle
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+        shell: bash
+        run: |
+          cargo install cargo-ndk \
+            --version "${{ env.CARGO_NDK_VERSION }}" \
+            --locked
+
+          "./flutter/${{ matrix.ndk_script }}"
+
+          test -f \
+            "./target/${{ matrix.target }}/release/liblibrustdesk.so"
+
+      - name: Native kütüphaneyi artifact olarak yükle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dyodesk-android-lib-${{ matrix.arch }}
+          path: target/${{ matrix.target }}/release/liblibrustdesk.so
+          retention-days: 14
+
+  package-apk:
+    name: DyoDesk Universal APK
+    needs:
+      - generate-bridge
+      - build-native-libs
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Kaynak kodu al
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          submodules: recursive
+
+      - name: Flutter kur
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          flutter-version: ${{ env.ANDROID_FLUTTER_VERSION }}
+          cache: true
+
+      - name: Flutter yamasını uygula
+        shell: bash
+        run: |
+          FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
+          PATCH_FILE="$GITHUB_WORKSPACE/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+
+          cd "$FLUTTER_ROOT"
+
+          if git apply --check "$PATCH_FILE"; then
+            git apply "$PATCH_FILE"
+            echo "Flutter yaması uygulandı."
+          elif git apply --reverse --check "$PATCH_FILE"; then
+            echo "Flutter yaması zaten uygulanmış."
+          else
+            echo "Flutter yaması uyumlu değil."
+            exit 1
+          fi
+
+      - name: Android NDK kur
+        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779
+        id: setup-ndk
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: true
+
+      - name: Bridge dosyalarını indir
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: bridge-artifact
+          path: ./
+
+      - name: ARM64 kütüphanesini indir
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: dyodesk-android-lib-arm64
+          path: ./android-libs/arm64
+
+      - name: ARMv7 kütüphanesini indir
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: dyodesk-android-lib-armv7
+          path: ./android-libs/armv7
+
+      - name: DyoDesk arayüz ve marka yamalarını uygula
+        shell: bash
+        run: |
+          python3 ./res/dyodesk_ui_patch.py
+          python3 ./res/dyodesk_brand_patch.py
+          python3 ./res/dyodesk_theme_patch.py
+          python3 ./res/dyodesk_android_patch.py
+
+      - name: Android native dosyalarını yerleştir
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        shell: bash
+        run: |
+          mkdir -p \
+            ./flutter/android/app/src/main/jniLibs/arm64-v8a \
+            ./flutter/android/app/src/main/jniLibs/armeabi-v7a
+
+          cp \
+            ./android-libs/arm64/liblibrustdesk.so \
+            ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
+
+          cp \
+            ./android-libs/armv7/liblibrustdesk.so \
+            ./flutter/android/app/src/main/jniLibs/armeabi-v7a/librustdesk.so
+
+          cp \
+            "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" \
+            ./flutter/android/app/src/main/jniLibs/arm64-v8a/
+
+          cp \
+            "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so" \
+            ./flutter/android/app/src/main/jniLibs/armeabi-v7a/
+
+      - name: DyoDesk Android ikonlarını üret
+        shell: bash
+        run: |
+          cd flutter
+          flutter pub get
+          dart run flutter_launcher_icons
+
+      - name: Test APK'sını derle
+        shell: bash
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        run: |
+          export PATH="$JAVA_HOME/bin:$PATH"
+
+          sed -i \
+            "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" \
+            ./flutter/android/gradle.properties
+
+          # İlk test APK'sını GitHub runner'ın debug anahtarıyla imzala.
+          sed -i \
+            "s/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/g" \
+            ./flutter/android/app/build.gradle
+
+          cd flutter
+
+          flutter build apk \
+            --release \
+            --target-platform android-arm,android-arm64
+
+          cp \
+            build/app/outputs/flutter-apk/app-release.apk \
+            ../DyoDesk-Android.apk
+
+      - name: APK içeriğini doğrula
+        shell: bash
+        run: |
+          test -f ./DyoDesk-Android.apk
+
+          unzip -l ./DyoDesk-Android.apk | grep "lib/arm64-v8a/librustdesk.so"
+          unzip -l ./DyoDesk-Android.apk | grep "lib/armeabi-v7a/librustdesk.so"
+
+          ls -lh ./DyoDesk-Android.apk
+
+      - name: DyoDesk APK artifact yükle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dyodesk-android-universal
+          path: DyoDesk-Android.apk
+          retention-days: 14
