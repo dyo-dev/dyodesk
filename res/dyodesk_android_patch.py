@@ -126,12 +126,18 @@ PUBSPEC.write_text(pubspec, encoding="utf-8")
 
 server_page = SERVER_PAGE.read_text(encoding="utf-8")
 
-floating_init_old = """  @override
+floating_init_old = """class _ServerPageState extends State<ServerPage> {
+  Timer? _updateTimer;
+
+  @override
   void initState() {
     super.initState();
 """
 
-floating_init_new = """  @override
+floating_init_new = """class _ServerPageState extends State<ServerPage> {
+  Timer? _updateTimer;
+
+  @override
   void initState() {
     super.initState();
 
