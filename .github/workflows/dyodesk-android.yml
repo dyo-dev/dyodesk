@@ -192,6 +192,13 @@ jobs:
           flutter-version: ${{ env.ANDROID_FLUTTER_VERSION }}
           cache: true
 
+      - name: Java 17 kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          architecture: x64
+
       - name: Flutter yamasını uygula
         shell: bash
         run: |
@@ -289,10 +296,10 @@ jobs:
 
       - name: Test APK'sını derle
         shell: bash
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          echo "JAVA_HOME=$JAVA_HOME"
+          test -x "$JAVA_HOME/bin/java"
 
           sed -i \
             "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" \
