@@ -150,11 +150,6 @@ jobs:
         run: |
           python3 ./res/dyodesk_ui_patch.py
 
-      - name: DyoDesk Android varsayılanlarını uygula
-        shell: bash
-        run: |
-          python3 ./res/dyodesk_android_patch.py
-
       - name: Android native kütüphanesini derle
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
