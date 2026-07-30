@@ -8,7 +8,6 @@ BUILD_GRADLE = Path("flutter/android/app/build.gradle")
 STRINGS = Path("flutter/android/app/src/main/res/values/strings.xml")
 PUBSPEC = Path("flutter/pubspec.yaml")
 SERVER_PAGE = Path("flutter/lib/mobile/pages/server_page.dart")
-CONFIG_RS = Path("libs/hbb_common/src/config.rs")
 
 ICON_SOURCE = Path("res/dyodesk_icon.png")
 RES_ICON = Path("res/icon.png")
@@ -21,7 +20,6 @@ for required in (
     STRINGS,
     PUBSPEC,
     SERVER_PAGE,
-    CONFIG_RS,
     ICON_SOURCE,
 ):
     if not required.exists():
@@ -126,72 +124,34 @@ else:
 PUBSPEC.write_text(pubspec, encoding="utf-8")
 
 
-config_rs = CONFIG_RS.read_text(encoding="utf-8")
-
-floating_option_code = '''        config.options.insert(
-            "disable-floating-window".to_owned(),
-            "Y".to_owned(),
-        );
-'''
-
-if '"disable-floating-window".to_owned()' not in config_rs:
-    mutable_local_pattern = re.compile(
-        r'(impl\s+LocalConfig\s*\{\s*'
-        r'fn\s+load\(\)\s*->\s*LocalConfig\s*\{\s*'
-        r'let\s+mut\s+config\s*=\s*'
-        r'Config::load_::\s*<\s*LocalConfig\s*>\s*'
-        r'\(\s*"_local"\s*\)\s*;\s*)',
-        re.MULTILINE | re.DOTALL,
-    )
-    config_rs, mutable_count = mutable_local_pattern.subn(
-        lambda match: (
-            f"{match.group(1)}\n"
-            f"{floating_option_code}\n"
-        ),
-        config_rs,
-        count=1,
-    )
-
-    if mutable_count == 0:
-        direct_local_pattern = re.compile(
-            r'impl\s+LocalConfig\s*\{\s*'
-            r'fn\s+load\(\)\s*->\s*LocalConfig\s*\{\s*'
-            r'Config::load_::\s*<\s*LocalConfig\s*>\s*'
-            r'\(\s*"_local"\s*\)\s*'
-            r'\}\s*\}',
-            re.MULTILINE | re.DOTALL,
-        )
-        direct_local_replacement = '''impl LocalConfig {
-    fn load() -> LocalConfig {
-        let mut config =
-            Config::load_::<LocalConfig>("_local");
-
-        config.options.insert(
-            "disable-floating-window".to_owned(),
-            "Y".to_owned(),
-        );
-
-        config
-    }
-}'''
-        config_rs, direct_count = direct_local_pattern.subn(
-            direct_local_replacement,
-            config_rs,
-            count=1,
-        )
-        if direct_count != 1:
-            raise RuntimeError(
-                "Yüzen pencere varsayılanı LocalConfig içine eklenemedi."
-            )
-
-    print("Yüzen DyoDesk servis balonu varsayılan kapatıldı.")
-else:
-    print("Yüzen servis balonu ayarı zaten uygulanmış.")
-
-CONFIG_RS.write_text(config_rs, encoding="utf-8")
-
-
 server_page = SERVER_PAGE.read_text(encoding="utf-8")
+
+floating_init_old = """  @override
+  void initState() {
+    super.initState();
+"""
+
+floating_init_new = """  @override
+  void initState() {
+    super.initState();
+
+    if (bind.mainGetLocalOption(
+          key: kOptionDisableFloatingWindow,
+        ) != "Y") {
+      bind.mainSetLocalOption(
+        key: kOptionDisableFloatingWindow,
+        value: "Y",
+      );
+    }
+"""
+
+server_page = replace_once_or_keep(
+    server_page,
+    floating_init_old,
+    floating_init_new,
+    "Yüzen servis balonunu varsayılan kapatma",
+)
+
 if "class DyoDeskAndroidSetupCard" not in server_page:
     children_old = '''                        buildPresetPasswordWarningMobile(),
                         gFFI.serverModel.isStart
