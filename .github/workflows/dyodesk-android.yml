@@ -150,6 +150,11 @@ jobs:
         run: |
           python3 ./res/dyodesk_ui_patch.py
 
+      - name: DyoDesk Android varsayılanlarını uygula
+        shell: bash
+        run: |
+          python3 ./res/dyodesk_android_patch.py
+
       - name: Android native kütüphanesini derle
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
@@ -191,14 +196,7 @@ jobs:
           channel: stable
           flutter-version: ${{ env.ANDROID_FLUTTER_VERSION }}
           cache: true
-     
-      - name: Java 17 kur
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          architecture: x64
-          
+
       - name: Flutter yamasını uygula
         shell: bash
         run: |
@@ -275,18 +273,31 @@ jobs:
             "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so" \
             ./flutter/android/app/src/main/jniLibs/armeabi-v7a/
 
-      - name: DyoDesk Android ikonlarını üret
+      - name: DyoDesk Android ikonlarını temizle ve üret
         shell: bash
         run: |
+          find ./flutter/android/app/src/main/res \
+            -type f \
+            \( -name "ic_launcher*.png" -o -name "ic_launcher*.xml" \) \
+            -delete
+
           cd flutter
+          flutter clean
           flutter pub get
-          dart run flutter_launcher_icons
+          dart run flutter_launcher_icons -f pubspec.yaml
+
+          echo "Üretilen DyoDesk launcher ikonları:"
+          find ./android/app/src/main/res \
+            -type f \
+            -name "ic_launcher*" \
+            -print
 
       - name: Test APK'sını derle
         shell: bash
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          java -version
-          echo "JAVA_HOME=$JAVA_HOME"
+          export PATH="$JAVA_HOME/bin:$PATH"
 
           sed -i \
             "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" \
