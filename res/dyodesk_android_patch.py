@@ -419,20 +419,48 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
         children: [
           const Text(
             "Bu telefona veya tablete uzaktan bağlanmak için "
-            "aşağıdaki iki izni etkinleştirin.",
+            "aşağıdaki adımları sırayla tamamlayın.",
           ),
           const SizedBox(height: 10),
           if (!serverModel.inputOk)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.apps_outlined),
+                icon: const Icon(Icons.touch_app_outlined),
                 label: const Text(
-                  "1. Yüklü Uygulamaları Aç",
+                  "1. Giriş Kontrolü Uyarısını Aç",
+                ),
+                onPressed: serverModel.toggleInput,
+              ),
+            ),
+          if (!serverModel.inputOk)
+            const Padding(
+              padding: EdgeInsets.only(
+                left: 4,
+                right: 4,
+                bottom: 8,
+              ),
+              child: Text(
+                "Açılan erişilebilirlik ekranında DyoDesk Giriş "
+                "Hizmeti’ne dokunun. “Kısıtlanmış ayar” uyarısı "
+                "çıktığında Tamam deyip DyoDesk’e geri dönün.",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: MyTheme.darkGray,
+                ),
+              ),
+            ),
+          if (!serverModel.inputOk)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.settings_applications_outlined),
+                label: const Text(
+                  "2. DyoDesk Uygulama Bilgisini Aç",
                 ),
                 onPressed: () {
                   AndroidPermissionManager.startAction(
-                    "android.settings.MANAGE_APPLICATIONS_SETTINGS",
+                    "android.settings.APPLICATION_DETAILS_SETTINGS",
                   );
                 },
               ),
@@ -445,10 +473,9 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
                 bottom: 8,
               ),
               child: Text(
-                "Açılan uygulamalar listesinden DyoDesk’i seçin. "
-                "DyoDesk uygulama bilgisi ekranında sağ üstteki "
-                "üç noktaya dokunup “Kısıtlanmış ayarlara izin "
-                "ver” seçeneğini açın.",
+                "Sağ üstteki üç noktaya dokunup “Kısıtlanmış "
+                "ayarlara izin ver” seçeneğini açın ve DyoDesk’e "
+                "geri dönün.",
                 style: TextStyle(
                   fontSize: 12,
                   color: MyTheme.darkGray,
@@ -460,7 +487,9 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
               width: double.infinity,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.touch_app_outlined),
-                label: const Text("2. Giriş Kontrolünü Aç"),
+                label: const Text(
+                  "3. Giriş Kontrolünü Tekrar Aç",
+                ),
                 onPressed: serverModel.toggleInput,
               ),
             ),
@@ -469,7 +498,7 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
               width: double.infinity,
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.mobile_screen_share),
-                label: const Text("3. Ekran Yakalamayı Başlat"),
+                label: const Text("4. Ekran Yakalamayı Başlat"),
                 onPressed: startScreenCapture,
               ),
             ),
