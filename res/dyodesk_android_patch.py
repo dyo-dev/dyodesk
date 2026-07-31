@@ -8,6 +8,11 @@ BUILD_GRADLE = Path("flutter/android/app/build.gradle")
 STRINGS = Path("flutter/android/app/src/main/res/values/strings.xml")
 PUBSPEC = Path("flutter/pubspec.yaml")
 SERVER_PAGE = Path("flutter/lib/mobile/pages/server_page.dart")
+SETTINGS_PAGE = Path("flutter/lib/mobile/pages/settings_page.dart")
+MAIN_SERVICE = Path(
+    "flutter/android/app/src/main/kotlin/"
+    "com/carriez/flutter_hbb/MainService.kt"
+)
 
 ICON_SOURCE = Path("res/dyodesk_icon.png")
 RES_ICON = Path("res/icon.png")
@@ -20,6 +25,8 @@ for required in (
     STRINGS,
     PUBSPEC,
     SERVER_PAGE,
+    SETTINGS_PAGE,
+    MAIN_SERVICE,
     ICON_SOURCE,
 ):
     if not required.exists():
@@ -90,6 +97,172 @@ strings = strings.replace(
     "DyoDesk ekran paylaşımı kurulduğunda",
 )
 STRINGS.write_text(strings, encoding="utf-8")
+
+
+# ---------------------------------------------------------
+# Android ön plan servis bildirimi
+# ---------------------------------------------------------
+
+main_service = MAIN_SERVICE.read_text(encoding="utf-8")
+
+main_service = replace_once_or_keep(
+    main_service,
+    'const val DEFAULT_NOTIFY_TITLE = "RustDesk"',
+    'const val DEFAULT_NOTIFY_TITLE = "DyoDesk"',
+    "Android servis bildirim başlığı",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    'const val DEFAULT_NOTIFY_TEXT = "Service is running"',
+    'const val DEFAULT_NOTIFY_TEXT = "DyoDesk hizmeti çalışıyor"',
+    "Android servis bildirim metni",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    'PowerManager.WakeLock, "rustdesk:wakelock"',
+    'PowerManager.WakeLock, "dyodesk:wakelock"',
+    "Android wake lock adı",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    '"RustDeskVD"',
+    '"DyoDeskVD"',
+    "Android sanal ekran adı",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    'val channelId = "RustDesk"',
+    'val channelId = "DyoDesk"',
+    "Android bildirim kanal kimliği",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    'val channelName = "RustDesk Service"',
+    'val channelName = "DyoDesk Hizmeti"',
+    "Android bildirim kanal adı",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    'description = "RustDesk Service Channel"',
+    'description = "DyoDesk hizmet bildirimleri"',
+    "Android bildirim kanal açıklaması",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    '.setContentText(translate(DEFAULT_NOTIFY_TEXT))',
+    '.setContentText(DEFAULT_NOTIFY_TEXT)',
+    "Android servis bildirimi çeviri bağımsızlığı",
+)
+
+main_service = replace_once_or_keep(
+    main_service,
+    'val text = _text ?: translate(DEFAULT_NOTIFY_TEXT)',
+    'val text = _text ?: DEFAULT_NOTIFY_TEXT',
+    "Android servis güncelleme bildirimi",
+)
+
+MAIN_SERVICE.write_text(
+    main_service,
+    encoding="utf-8",
+)
+
+
+# ---------------------------------------------------------
+# Mobil Hakkında bölümündeki RustDesk markasını kaldır
+# ---------------------------------------------------------
+
+settings_page = SETTINGS_PAGE.read_text(encoding="utf-8")
+
+about_tile_old = """            SettingsTile(
+                onPressed: (context) async {
+                  await launchUrl(Uri.parse(url));
+                },
+                title: Text(translate("Version: ") + version),
+                value: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('rustdesk.com',
+                      style: TextStyle(
+                        decoration: TextDecoration.underline,
+                      )),
+                ),
+                leading: Icon(Icons.info)),"""
+
+about_tile_new = """            SettingsTile(
+                title: Text(
+                  "DyoDesk • " + translate("Version: ") + version,
+                ),
+                value: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text("Dyo Bilgi Sistemleri"),
+                ),
+                leading: const Icon(Icons.info)),"""
+
+settings_page = replace_once_or_keep(
+    settings_page,
+    about_tile_old,
+    about_tile_new,
+    "Mobil Hakkında sürüm kartı",
+)
+
+show_about_old = """void showAbout(OverlayDialogManager dialogManager) {
+  dialogManager.show((setState, close, context) {
+    return CustomAlertDialog(
+      title: Text(translate('About RustDesk')),
+      content: Wrap(direction: Axis.vertical, spacing: 12, children: [
+        Text('Version: $version'),
+        InkWell(
+            onTap: () async {
+              const url = 'https://rustdesk.com/';
+              await launchUrl(Uri.parse(url));
+            },
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('rustdesk.com',
+                  style: TextStyle(
+                    decoration: TextDecoration.underline,
+                  )),
+            )),
+      ]),
+      actions: [],
+    );
+  }, clickMaskDismiss: true, backDismiss: true);
+}"""
+
+show_about_new = """void showAbout(OverlayDialogManager dialogManager) {
+  dialogManager.show((setState, close, context) {
+    return CustomAlertDialog(
+      title: const Text('DyoDesk Hakkında'),
+      content: Wrap(
+        direction: Axis.vertical,
+        spacing: 12,
+        children: [
+          Text('Sürüm: $version'),
+          const Text('Dyo Bilgi Sistemleri'),
+        ],
+      ),
+      actions: const [],
+    );
+  }, clickMaskDismiss: true, backDismiss: true);
+}"""
+
+settings_page = replace_once_or_keep(
+    settings_page,
+    show_about_old,
+    show_about_new,
+    "Mobil Hakkında penceresi",
+)
+
+SETTINGS_PAGE.write_text(
+    settings_page,
+    encoding="utf-8",
+)
 
 
 shutil.copy2(ICON_SOURCE, RES_ICON)
@@ -209,13 +382,36 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
             "aşağıdaki iki izni etkinleştirin.",
           ),
           const SizedBox(height: 10),
-          if (!serverModel.mediaOk)
+          if (!serverModel.inputOk)
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.mobile_screen_share),
-                label: const Text("1. Ekran Yakalamayı Başlat"),
-                onPressed: startScreenCapture,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.settings_applications_outlined),
+                label: const Text(
+                  "1. Kısıtlanmış Ayarlara İzin Ver",
+                ),
+                onPressed: () {
+                  AndroidPermissionManager.startAction(
+                    "android.settings.APPLICATION_DETAILS_SETTINGS",
+                  );
+                },
+              ),
+            ),
+          if (!serverModel.inputOk)
+            const Padding(
+              padding: EdgeInsets.only(
+                left: 4,
+                right: 4,
+                bottom: 8,
+              ),
+              child: Text(
+                "Açılan DyoDesk uygulama bilgisi ekranında sağ "
+                "üstteki üç noktaya dokunup “Kısıtlanmış "
+                "ayarlara izin ver” seçeneğini açın.",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: MyTheme.darkGray,
+                ),
               ),
             ),
           if (!serverModel.inputOk)
@@ -227,10 +423,19 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
                 onPressed: serverModel.toggleInput,
               ),
             ),
+          if (!serverModel.mediaOk)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.mobile_screen_share),
+                label: const Text("3. Ekran Yakalamayı Başlat"),
+                onPressed: startScreenCapture,
+              ),
+            ),
           const SizedBox(height: 4),
           const Text(
-            "Android güvenliği nedeniyle sistem izinlerinin "
-            "kullanıcı tarafından onaylanması gerekir.",
+            "Android güvenliği nedeniyle bu izinler sessizce "
+            "açılamaz; sistem ekranlarında kullanıcı onayı gerekir.",
             style: TextStyle(
               fontSize: 12,
               color: MyTheme.darkGray,
@@ -263,3 +468,5 @@ print("DyoDesk Android marka ve kullanım yaması tamamlandı.")
 print("Launcher ve adaptive ikonlar: DyoDesk")
 print("Yüzen servis balonu: Varsayılan kapalı")
 print("İzin kurulum yönlendirmesi: Eklendi")
+print("Servis bildirimi: DyoDesk olarak markalandı")
+print("Hakkında bölümü: DyoDesk olarak markalandı")
