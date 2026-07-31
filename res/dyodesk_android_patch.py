@@ -13,6 +13,10 @@ MAIN_SERVICE = Path(
     "flutter/android/app/src/main/kotlin/"
     "com/carriez/flutter_hbb/MainService.kt"
 )
+MAIN_ACTIVITY = Path(
+    "flutter/android/app/src/main/kotlin/"
+    "com/carriez/flutter_hbb/MainActivity.kt"
+)
 ANDROID_COMMON_KT = Path(
     "flutter/android/app/src/main/kotlin/"
     "com/carriez/flutter_hbb/common.kt"
@@ -31,6 +35,7 @@ for required in (
     SERVER_PAGE,
     SETTINGS_PAGE,
     MAIN_SERVICE,
+    MAIN_ACTIVITY,
     ANDROID_COMMON_KT,
     ICON_SOURCE,
 ):
@@ -208,8 +213,78 @@ main_service = replace_once_or_keep(
     "Android servis güncelleme bildirimi",
 )
 
+# Host modu kapalıysa uygulama son uygulamalardan atıldığında
+# ekran paylaşımı hizmetini ve kalıcı bildirimi durdur.
+host_task_old = """    override fun onDestroy() {
+        checkMediaPermission()
+        stopService(Intent(this, FloatingWindowService::class.java))
+        super.onDestroy()
+    }"""
+
+host_task_new = """    override fun onDestroy() {
+        checkMediaPermission()
+        stopService(Intent(this, FloatingWindowService::class.java))
+        super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (FFI.getLocalOption("dyodesk-host-mode") != "Y") {
+            destroy()
+        }
+        super.onTaskRemoved(rootIntent)
+    }"""
+
+main_service = replace_once_or_keep(
+    main_service,
+    host_task_old,
+    host_task_new,
+    "Android Host modu görev kapatma davranışı",
+)
+
 MAIN_SERVICE.write_text(
     main_service,
+    encoding="utf-8",
+)
+
+
+# ---------------------------------------------------------
+# Android ana uygulama kapanış davranışı
+# ---------------------------------------------------------
+
+main_activity = MAIN_ACTIVITY.read_text(encoding="utf-8")
+
+activity_destroy_old = """    override fun onDestroy() {
+        Log.e(logTag, "onDestroy")
+        mainService?.let {
+            unbindService(serviceConnection)
+        }
+        super.onDestroy()
+    }"""
+
+activity_destroy_new = """    override fun onDestroy() {
+        Log.e(logTag, "onDestroy")
+
+        if (isFinishing &&
+            FFI.getLocalOption("dyodesk-host-mode") != "Y") {
+            mainService?.destroy()
+        }
+
+        mainService?.let {
+            unbindService(serviceConnection)
+        }
+
+        super.onDestroy()
+    }"""
+
+main_activity = replace_once_or_keep(
+    main_activity,
+    activity_destroy_old,
+    activity_destroy_new,
+    "Android Host modu uygulama kapanış davranışı",
+)
+
+MAIN_ACTIVITY.write_text(
+    main_activity,
     encoding="utf-8",
 )
 
@@ -377,6 +452,7 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
 '''
     children_new = '''                        buildPresetPasswordWarningMobile(),
                         const DyoDeskAndroidSetupCard(),
+                        const DyoDeskHostModeCard(),
                         gFFI.serverModel.isStart
 '''
     server_page = replace_once_or_keep(
@@ -388,7 +464,63 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
 
     class_marker = "class ServiceNotRunningNotification extends StatelessWidget"
 
-    setup_class = '''class DyoDeskAndroidSetupCard extends StatelessWidget {
+    setup_class = '''class DyoDeskHostModeCard extends StatefulWidget {
+  const DyoDeskHostModeCard({Key? key}) : super(key: key);
+
+  @override
+  State<DyoDeskHostModeCard> createState() =>
+      _DyoDeskHostModeCardState();
+}
+
+class _DyoDeskHostModeCardState extends State<DyoDeskHostModeCard> {
+  bool _hostMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _hostMode =
+        bind.mainGetLocalOption(key: "dyodesk-host-mode") == "Y";
+  }
+
+  void _setHostMode(bool value) {
+    bind.mainSetLocalOption(
+      key: "dyodesk-host-mode",
+      value: value ? "Y" : "N",
+    );
+
+    setState(() {
+      _hostMode = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PaddingCard(
+      title: "Uzaktan Erişim Modu",
+      titleIcon: const Icon(
+        Icons.settings_remote_outlined,
+        color: Colors.redAccent,
+      ),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text(
+          "Bu cihaza uzaktan erişimi açık tut",
+        ),
+        subtitle: Text(
+          _hostMode
+              ? "Host modu açık: DyoDesk kapatılsa bile servis "
+                  "ve bildirim çalışmaya devam eder."
+              : "Normal mod: DyoDesk kapatıldığında servis ve "
+                  "bildirim durur. Bu ayar önerilir.",
+        ),
+        value: _hostMode,
+        onChanged: _setHostMode,
+      ),
+    );
+  }
+}
+
+class DyoDeskAndroidSetupCard extends StatelessWidget {
   const DyoDeskAndroidSetupCard({Key? key}) : super(key: key);
 
   @override
@@ -454,13 +586,13 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.settings_applications_outlined),
+                icon: const Icon(Icons.apps_outlined),
                 label: const Text(
-                  "2. DyoDesk Uygulama Bilgisini Aç",
+                  "2. Yüklü Uygulamaları Aç",
                 ),
                 onPressed: () {
                   AndroidPermissionManager.startAction(
-                    "android.settings.APPLICATION_DETAILS_SETTINGS",
+                    "android.settings.MANAGE_APPLICATIONS_SETTINGS",
                   );
                 },
               ),
@@ -473,9 +605,10 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
                 bottom: 8,
               ),
               child: Text(
-                "Sağ üstteki üç noktaya dokunup “Kısıtlanmış "
-                "ayarlara izin ver” seçeneğini açın ve DyoDesk’e "
-                "geri dönün.",
+                "Açılan listeden DyoDesk’i seçin. DyoDesk "
+                "uygulama bilgisi ekranında sağ üstteki üç "
+                "noktaya dokunup “Kısıtlanmış ayarlara izin "
+                "ver” seçeneğini açın ve DyoDesk’e geri dönün.",
                 style: TextStyle(
                   fontSize: 12,
                   color: MyTheme.darkGray,
@@ -541,3 +674,5 @@ print("İzin kurulum yönlendirmesi: Eklendi")
 print("Servis bildirimi: DyoDesk olarak markalandı")
 print("Hakkında bölümü: DyoDesk olarak markalandı")
 print("Yüklü uygulamalar yönlendirmesi: Düzeltildi")
+print("Host modu: Varsayılan kapalı")
+print("Normal modda uygulama kapanınca servis: Otomatik durur")
