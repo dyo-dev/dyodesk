@@ -121,8 +121,8 @@ main_service = replace_once_or_keep(
 
 main_service = replace_once_or_keep(
     main_service,
-    'PowerManager.WakeLock, "rustdesk:wakelock"',
-    'PowerManager.WakeLock, "dyodesk:wakelock"',
+    '"rustdesk:wakelock"',
+    '"dyodesk:wakelock"',
     "Android wake lock adı",
 )
 
