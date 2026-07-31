@@ -386,13 +386,13 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                icon: const Icon(Icons.settings_applications_outlined),
+                icon: const Icon(Icons.apps_outlined),
                 label: const Text(
-                  "1. Kısıtlanmış Ayarlara İzin Ver",
+                  "1. Yüklü Uygulamaları Aç",
                 ),
                 onPressed: () {
                   AndroidPermissionManager.startAction(
-                    "android.settings.APPLICATION_DETAILS_SETTINGS",
+                    "android.settings.MANAGE_APPLICATIONS_SETTINGS",
                   );
                 },
               ),
@@ -405,9 +405,10 @@ if "class DyoDeskAndroidSetupCard" not in server_page:
                 bottom: 8,
               ),
               child: Text(
-                "Açılan DyoDesk uygulama bilgisi ekranında sağ "
-                "üstteki üç noktaya dokunup “Kısıtlanmış "
-                "ayarlara izin ver” seçeneğini açın.",
+                "Açılan uygulamalar listesinden DyoDesk’i seçin. "
+                "DyoDesk uygulama bilgisi ekranında sağ üstteki "
+                "üç noktaya dokunup “Kısıtlanmış ayarlara izin "
+                "ver” seçeneğini açın.",
                 style: TextStyle(
                   fontSize: 12,
                   color: MyTheme.darkGray,
