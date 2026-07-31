@@ -13,6 +13,10 @@ MAIN_SERVICE = Path(
     "flutter/android/app/src/main/kotlin/"
     "com/carriez/flutter_hbb/MainService.kt"
 )
+ANDROID_COMMON_KT = Path(
+    "flutter/android/app/src/main/kotlin/"
+    "com/carriez/flutter_hbb/common.kt"
+)
 
 ICON_SOURCE = Path("res/dyodesk_icon.png")
 RES_ICON = Path("res/icon.png")
@@ -27,6 +31,7 @@ for required in (
     SERVER_PAGE,
     SETTINGS_PAGE,
     MAIN_SERVICE,
+    ANDROID_COMMON_KT,
     ICON_SOURCE,
 ):
     if not required.exists():
@@ -97,6 +102,41 @@ strings = strings.replace(
     "DyoDesk ekran paylaşımı kurulduğunda",
 )
 STRINGS.write_text(strings, encoding="utf-8")
+
+
+# ---------------------------------------------------------
+# Android ayarlar ekranı yönlendirmesini düzelt
+#
+# ACTION_MANAGE_APPLICATIONS_SETTINGS veri URI'si kabul etmez.
+# RustDesk'in ortak startAction yardımcı fonksiyonu ise
+# accessibility dışındaki her action'a package: URI ekliyordu.
+# Bu nedenle Samsung'da butona basıldığında hiçbir ekran açılmıyordu.
+# ---------------------------------------------------------
+
+android_common = ANDROID_COMMON_KT.read_text(encoding="utf-8")
+
+start_action_old = """            // don't pass package name when launch ACTION_ACCESSIBILITY_SETTINGS
+            if (ACTION_ACCESSIBILITY_SETTINGS != action) {
+                data = Uri.parse("package:" + context.packageName)
+            }"""
+
+start_action_new = """            // These settings screens do not accept a package data URI.
+            if (ACTION_ACCESSIBILITY_SETTINGS != action &&
+                ACTION_MANAGE_APPLICATIONS_SETTINGS != action) {
+                data = Uri.parse("package:" + context.packageName)
+            }"""
+
+android_common = replace_once_or_keep(
+    android_common,
+    start_action_old,
+    start_action_new,
+    "Android yüklü uygulamalar ekranı yönlendirmesi",
+)
+
+ANDROID_COMMON_KT.write_text(
+    android_common,
+    encoding="utf-8",
+)
 
 
 # ---------------------------------------------------------
@@ -471,3 +511,4 @@ print("Yüzen servis balonu: Varsayılan kapalı")
 print("İzin kurulum yönlendirmesi: Eklendi")
 print("Servis bildirimi: DyoDesk olarak markalandı")
 print("Hakkında bölümü: DyoDesk olarak markalandı")
+print("Yüklü uygulamalar yönlendirmesi: Düzeltildi")
