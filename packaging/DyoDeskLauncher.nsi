@@ -148,7 +148,7 @@ Function ModePageCreate
   ${NSD_OnClick} $InstallButton InstallClicked
 
   ${NSD_CreateLabel} 4u 128u 96% 20u \
-    "Sürekli erişim: Windows hizmeti, açılışta çalışma ve UAC desteği sağlar."
+    "Sürekli erişim: Windows hizmeti, açılışta çalışma, UAC ve güvenlik duvarı desteği sağlar."
   Pop $0
 
   nsDialogs::Show
@@ -219,6 +219,53 @@ Function RunPortable
   ExecWait '"$PLUGINSDIR\DyoDesk\DyoDesk.exe"' $ResultCode
   SetErrorLevel $ResultCode
   Quit
+FunctionEnd
+
+
+Function AddFirewallRules
+  DetailPrint "DyoDesk güvenlik duvarı izinleri oluşturuluyor..."
+
+  ; Güncelleme kurulumlarında eski DyoDesk kurallarını temizle.
+  nsExec::ExecToLog \
+    '"$SYSDIR\netsh.exe" advfirewall firewall delete rule name="DyoDesk Gelen Bağlantılar"'
+  Pop $ResultCode
+
+  nsExec::ExecToLog \
+    '"$SYSDIR\netsh.exe" advfirewall firewall delete rule name="DyoDesk Giden Bağlantılar"'
+  Pop $ResultCode
+
+  ; DyoDesk.exe için tüm ağ profillerinde gelen bağlantılara izin ver.
+  nsExec::ExecToLog \
+    '"$SYSDIR\netsh.exe" advfirewall firewall add rule name="DyoDesk Gelen Bağlantılar" dir=in action=allow program="$INSTDIR\DyoDesk.exe" enable=yes profile=any protocol=any'
+  Pop $ResultCode
+
+  ${If} $ResultCode != 0
+    MessageBox MB_ICONEXCLAMATION|MB_OK \
+      "DyoDesk gelen bağlantı güvenlik duvarı kuralı oluşturulamadı.$\r$\n$\r$\nKurulum devam edecek ancak uzak bağlantı güvenlik duvarı tarafından engellenebilir."
+  ${EndIf}
+
+  ; Çıkışların kurumsal ilkeyle kapatıldığı sistemler için giden izni de ekle.
+  nsExec::ExecToLog \
+    '"$SYSDIR\netsh.exe" advfirewall firewall add rule name="DyoDesk Giden Bağlantılar" dir=out action=allow program="$INSTDIR\DyoDesk.exe" enable=yes profile=any protocol=any'
+  Pop $ResultCode
+
+  ${If} $ResultCode != 0
+    MessageBox MB_ICONEXCLAMATION|MB_OK \
+      "DyoDesk giden bağlantı güvenlik duvarı kuralı oluşturulamadı.$\r$\n$\r$\nKurulum devam edecek ancak bağlantı kurumsal güvenlik duvarı ilkeleri tarafından engellenebilir."
+  ${EndIf}
+FunctionEnd
+
+
+Function un.RemoveFirewallRules
+  DetailPrint "DyoDesk güvenlik duvarı izinleri kaldırılıyor..."
+
+  nsExec::ExecToLog \
+    '"$SYSDIR\netsh.exe" advfirewall firewall delete rule name="DyoDesk Gelen Bağlantılar"'
+  Pop $ResultCode
+
+  nsExec::ExecToLog \
+    '"$SYSDIR\netsh.exe" advfirewall firewall delete rule name="DyoDesk Giden Bağlantılar"'
+  Pop $ResultCode
 FunctionEnd
 
 
@@ -333,6 +380,8 @@ Function InstallDyoDesk
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\DyoDesk" \
     "NoRepair" 1
 
+  Call AddFirewallRules
+
   DetailPrint "DyoDesk Windows hizmeti kuruluyor..."
 
   nsExec::ExecToLog \
@@ -343,7 +392,7 @@ Function InstallDyoDesk
   Call FindAndStartService
 
   MessageBox MB_ICONINFORMATION|MB_OK \
-    "DyoDesk kurulumu tamamlandı.$\r$\n$\r$\n$ArchitectureText istemci ve Windows hizmeti hazırlandı."
+    "DyoDesk kurulumu tamamlandı.$\r$\n$\r$\n$ArchitectureText istemci, Windows hizmeti ve güvenlik duvarı izinleri hazırlandı."
 
   Exec '"$INSTDIR\DyoDesk.exe"'
   Quit
@@ -387,6 +436,8 @@ Section "Uninstall"
   Pop $ResultCode
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /IM DyoDesk.exe'
   Pop $ResultCode
+
+  Call un.RemoveFirewallRules
 
   Delete "$DESKTOP\DyoDesk.lnk"
   RMDir /r "$SMPROGRAMS\DyoDesk"
